@@ -1,0 +1,170 @@
+<!-- =========================
+Insurance Vault MVP (Enhanced)
+Files to create in your repo:
+1. index.html
+2. manifest.json
+3. sw.js
+========================= --><!-- =========================
+index.html
+========================= --><!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insurance Vault</title>
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+<style>
+body { margin:0; font-family: Arial; background:#0f172a; color:white; }
+.container { padding:20px; max-width:600px; margin:auto; }
+button { width:100%; padding:18px; margin:8px 0; font-size:18px; border:none; border-radius:12px; }
+.primary { background:#ef4444; }
+.secondary { background:#3b82f6; }
+.card { background:#1e293b; padding:15px; border-radius:12px; margin-top:10px; }
+input { width:100%; padding:12px; margin:6px 0; border-radius:8px; border:none; }
+.big { font-size:26px; font-weight:bold; }
+</style>
+</head>
+<body>
+<div class="container" id="app"></div>
+<canvas id="qrCanvas" style="display:none"></canvas>
+<video id="video" style="width:100%; display:none"></video><script>
+let db;
+const request = indexedDB.open("vaultDB", 1);
+
+request.onupgradeneeded = e => {
+  db = e.target.result;
+  db.createObjectStore("policies", { keyPath: "id", autoIncrement: true });
+};
+
+request.onsuccess = e => { db = e.target.result; renderHome(); };
+
+function tx(mode){ return db.transaction("policies", mode).objectStore("policies"); }
+
+function getPolicies(cb){
+  const req = tx("readonly").getAll();
+  req.onsuccess = () => cb(req.result);
+}
+
+function addPolicy(data){ tx("readwrite").add(data); setTimeout(renderHome,200); }
+
+function renderHome(){
+  getPolicies(policies => {
+    let html = `
+      <h2>Insurance Vault</h2>
+      <button class="primary" onclick="renderEmergency()">🚨 Emergency</button>
+      <button class="secondary" onclick="renderAdd()">+ Add Policy</button>
+      <button onclick="exportQR()">📤 Export QR</button>
+      <button onclick="startScanner()">📥 Import QR</button>
+    `;
+
+    policies.forEach(p => {
+      html += `
+        <div class="card">
+          <b>${p.type}</b><br>
+          ${p.number}<br>
+          <a href="tel:${p.phone}">📞 Call</a>
+        </div>
+      `;
+    });
+
+    document.getElementById("app").innerHTML = html;
+  });
+}
+
+function renderAdd(){
+  app.innerHTML = `
+    <h2>Add Policy</h2>
+    <input id="type" placeholder="Type">
+    <input id="number" placeholder="Policy Number">
+    <input id="phone" placeholder="Phone">
+    <button onclick="savePolicy()">Save</button>
+  `;
+}
+
+function savePolicy(){
+  addPolicy({
+    type:type.value,
+    number:number.value,
+    phone:phone.value
+  });
+}
+
+function renderEmergency(){
+  getPolicies(policies => {
+    let html = `<h2>🚨 Emergency</h2><button onclick="renderHome()">Back</button>`;
+
+    policies.forEach(p => {
+      html += `
+        <div class="card">
+          <div class="big">${p.type}</div>
+          <div class="big">${p.number}</div>
+          <button class="primary" onclick="window.location='tel:${p.phone}'">Call Insurer</button>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="card">
+        <b>Car Accident Steps:</b>
+        <ul>
+          <li>Take photos</li>
+          <li>Do not admit fault</li>
+          <li>Call insurer</li>
+        </ul>
+      </div>
+    `;
+
+    app.innerHTML = html;
+  });
+}
+
+// QR EXPORT
+function exportQR(){
+  getPolicies(policies => {
+    const data = JSON.stringify(policies);
+    const canvas = document.getElementById("qrCanvas");
+    canvas.style.display = "block";
+    QRCode.toCanvas(canvas, data);
+    app.innerHTML = `<h2>Scan this QR on another device</h2>`;
+    app.appendChild(canvas);
+    app.innerHTML += `<button onclick="renderHome()">Done</button>`;
+  });
+}
+
+// QR IMPORT
+function startScanner(){
+  const video = document.getElementById("video");
+  video.style.display = "block";
+  navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }})
+  .then(stream => {
+    video.srcObject = stream;
+    video.setAttribute("playsinline", true);
+    video.play();
+    scanFrame();
+  });
+}
+
+function scanFrame(){
+  const video = document.getElementById("video");
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video,0,0);
+    const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code = jsQR(img.data, canvas.width, canvas.height);
+
+    if(code){
+      const data = JSON.parse(code.data);
+      data.forEach(p => tx("readwrite").add(p));
+      video.srcObject.getTracks().forEach(t=>t.stop());
+      video.style.display="none";
+      renderHome();
+      return;
+    }
+  }
+  requestAnimationFrame(scanFrame);
+}
