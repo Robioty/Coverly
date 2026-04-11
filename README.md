@@ -1,111 +1,166 @@
 # Coverly 🛡️
 
-Coverly is a **privacy-first, offline-capable insurance vault** designed for emergency situations.
+**Coverly** is a privacy-first, offline-capable insurance vault designed for emergency situations.
 
-It allows users to store key policy details locally on their device and quickly access or share them when needed.
+Store key policy details locally on your device and access or share them instantly — even without internet.
 
 ---
 
-## 🚀 Features
+## 🚀 v2.0 Features
 
-### 🔐 Privacy First
-- No accounts
-- No cloud storage
-- No tracking
+### 🔐 Privacy & Security
+- No accounts, no cloud, no tracking
 - All data stored locally using IndexedDB
+- **NEW: 4-digit PIN lock** with secure local storage
+- PIN setup wizard with confirmation step
+- Forgot PIN → clears all data (by design)
 
----
+### 🏠 Vault
+- Clean card-based policy list
+- Per-policy expiry status badges (Active / Expires soon / Expired)
+- Quick-action buttons (Call, SMS, WhatsApp) directly on cards
+- Empty state with onboarding prompt
+- Time-of-day greeting + live policy count
+- Location bar with reverse geocoded city name
 
-### 📱 Emergency Mode
-- One-tap access to policies
-- Call insurer directly
-- Send SMS with policy + location
-- Share via WhatsApp
+### 📋 Rich Policy Fields
+- Policy type (Car, Health, Home, Life, Travel, Pet, Business, Other)
+- Insurer name
+- Policy number
+- Claims phone number
+- Expiry date with status badge
+- **NEW: Per-policy emergency contact**
+- **NEW: Notes field** (excess, coverage details etc.)
 
----
+### ✏️ Full Policy Management
+- **NEW: Edit existing policies**
+- **NEW: Delete individual policies** with confirmation
+- Copy policy details to clipboard
+- Native share sheet (Web Share API)
+
+### 🚨 Emergency Mode
+- One-tap call to insurer
+- SMS with location link (Google Maps)
+- WhatsApp with location link
+- **NEW: Per-policy emergency contact button**
+- **NEW: "Get Location" button** if permission not yet granted
+- **NEW: Reverse geocoded location name** in display
+
+### 📸 Improved OCR Document Scanning
+- Upload photo of insurance document
+- **NEW: Smarter regex extraction** for:
+  - Policy number patterns (POL-XXXXXX, AA-123456 etc.)
+  - UK phone numbers (+44, 0800, etc.)
+  - Insurer name
+  - Expiry date (auto-converted to date field)
+- Pre-fills Add Policy form for review
 
 ### 📤 QR Backup & Transfer
-- Export policies as QR code
+- Export all policies as QR code (versioned v2 format)
 - Import on another device via camera
+- **NEW: Camera scan fully contained** in Scan tab
+- Handles both legacy and v2 QR formats
 - No internet required
 
----
-
-### 📸 OCR Document Scanning (NEW)
-- Upload photo of insurance document
-- Automatically extracts:
-  - Policy number
-  - Phone number
-- Pre-fills form for faster entry
-
----
-
 ### 📍 Location Awareness
-- Automatically includes GPS location in emergency messages
+- GPS location in emergency messages as Google Maps link
+- **NEW: Reverse geocode** (OpenStreetMap Nominatim) for human-readable location name
+
+### 🎨 UI / UX
+- **NEW: Full onboarding flow** (4 screens, skippable after first run)
+- **NEW: Bottom sheet modals** for confirmations and loading states
+- **NEW: DM Sans + DM Mono** typography
+- **NEW: Sticky headers** with blur/glass effect
+- **NEW: Safe area insets** for iPhone notch/Dynamic Island
+- **NEW: Page entrance animations**
+- **NEW: Expiry date badges** (Active / Expires soon / Expired)
+- Responsive max-width layout (good on tablet too)
+- Dark theme throughout
+
+### 📦 Offline / PWA
+- Service Worker with cache-first strategy
+- **NEW: SPA fallback** for navigation requests
+- **NEW: manifest.json shortcuts** (Emergency, Add Policy)
+- **NEW: PWA install prompt** from Settings
+- Installable on Android (Play Store via TWA) and iOS
 
 ---
 
-### 📦 Offline Ready
-- Works as a PWA
-- Installable on mobile
-- Fully functional without internet
+## 🗂️ File Structure
+
+```
+/
+├── index.html        ← Main app (single file PWA)
+├── manifest.json     ← PWA manifest
+├── sw.js             ← Service worker
+├── icons/
+│   ├── icon-192.png  ← App icon (you need to add these)
+│   └── icon-512.png
+└── screenshots/
+    └── home.png      ← Play Store screenshot (optional)
+```
+
+---
+
+## 🚀 Deployment
+
+### GitHub Pages
+1. Push files to a GitHub repo
+2. Enable Pages → `main` branch → `/` (root)
+3. Visit `https://yourusername.github.io/coverly`
+
+### Play Store (TWA)
+Use [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) or [PWABuilder](https://www.pwabuilder.com/) to wrap the PWA into an Android APK.
 
 ---
 
 ## 🧠 How It Works
 
-- Data stored in browser (IndexedDB)
-- Service Worker caches app for offline use
-- QR codes used for data transfer
-- OCR powered by Tesseract.js
+| Feature | Technology |
+|---|---|
+| Data storage | IndexedDB (browser-native) |
+| Offline | Service Worker + Cache API |
+| QR codes | qrcode.js + jsQR |
+| OCR | Tesseract.js v5 |
+| Location | Geolocation API + OSM Nominatim |
+| Security | PIN stored in localStorage |
+| Share | Web Share API + SMS/WhatsApp URIs |
 
 ---
 
 ## ⚠️ Limitations
 
-- OCR accuracy varies depending on image quality
-- No cloud backup (by design)
-- Data lost if browser storage is cleared
-- Emergency contact not yet tied per policy
-- No encryption (yet)
+- OCR accuracy varies with image quality
+- No cloud backup (by design — privacy first)
+- Data lost if browser storage is cleared (use QR export regularly)
+- PIN stored in localStorage — not hardware-encrypted
+- QR codes have size limits (~2KB); very large datasets may fail
 
 ---
 
-## 🔮 Future Improvements
+## 🔮 Future Roadmap
 
 ### High Impact
-- 🔐 Local encryption (PIN / biometric)
-- 👤 Per-policy emergency contacts
-- 📂 Document storage (images, PDFs)
-- 🧠 Smarter OCR (AI parsing)
+- 🔐 Biometric unlock (WebAuthn / FaceID)
+- 📅 Renewal reminders (local push notifications)
+- 📂 Document photo storage (attach image to policy)
+- ☁️ Optional encrypted backup (iCloud/Google Drive)
+- 🧠 AI-powered OCR (Claude API integration)
 
-### UX Improvements
-- Edit / delete policies
-- Onboarding flow
-- Confirmation screens
-- Better empty states
+### UX
+- 🌍 what3words integration for precise location
+- 📲 AirDrop / Nearby Share support
+- 🌐 Multi-language support
+- 🎨 Light mode
 
-### Advanced Features
-- 🌍 what3words integration
-- 📅 Renewal reminders (local notifications)
-- ☁️ Optional encrypted backup
-- 📲 Share via AirDrop / Nearby Share
-
----
-
-## 🧪 Testing Checklist
-
-- Add multiple policies
-- Export + import via QR
-- Test offline mode
-- Test SMS / WhatsApp sharing
-- Test OCR with real documents
+### Advanced
+- 🔑 Full AES-256 encryption of IndexedDB
+- 📊 Policy dashboard (total coverage overview)
+- 🔔 Expiry notifications
 
 ---
 
 ## 💡 Philosophy
-
-Coverly is built on a simple idea:
 
 > Your most important financial information should be **private, accessible, and reliable — even without the internet.**
 
@@ -113,4 +168,4 @@ Coverly is built on a simple idea:
 
 ## 📄 License
 
-MIT (or your choice)
+MIT
