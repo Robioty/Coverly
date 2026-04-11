@@ -3,7 +3,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coverly</title>
-<link rel="manifest" href="manifest.json"><script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script><style>
+<link rel="manifest" href="manifest.json"><script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script><style>
 :root{--bg:#0f172a;--card:#1e293b;--accent:#ef4444;--blue:#3b82f6}
 body{margin:0;font-family:system-ui;background:var(--bg);color:#fff}
 .header{position:sticky;top:0;background:#020617;padding:14px;display:flex;justify-content:space-between}
@@ -16,7 +16,6 @@ button{width:100%;padding:14px;margin:6px 0;border:none;border-radius:12px;font-
 .big{font-size:20px;font-weight:700}
 .small{opacity:.7;font-size:13px}
 input{width:100%;padding:12px;margin:6px 0;border-radius:10px;border:none}
-.fab{position:fixed;bottom:80px;right:20px;background:var(--accent);padding:16px 18px;border-radius:999px}
 .nav{position:fixed;bottom:0;width:100%;background:#020617;display:flex}
 .nav button{flex:1;background:none;color:#fff;padding:14px}
 .toast{position:fixed;bottom:140px;left:50%;transform:translateX(-50%);background:#111;padding:10px 16px;border-radius:10px;opacity:0;transition:.3s}
@@ -24,9 +23,10 @@ input{width:100%;padding:12px;margin:6px 0;border-radius:10px;border:none}
 </style></head><body>
 <div id="app"></div>
 <div id="toast" class="toast"></div>
-<canvas id="qrCanvas" style="display:none"></canvas>
-<video id="video" style="width:100%;display:none"></video><script>
-let db,stream=null,locationStr=null,contact="";
+<canvas id="qrCanvas"></canvas>
+<video id="video" style="width:100%;display:none"></video>
+<input type="file" id="fileInput" accept="image/*" style="display:none"><script>
+let db,stream=null,locationStr=null;
 
 const req=indexedDB.open("coverlyDB",1);
 req.onupgradeneeded=e=>e.target.result.createObjectStore("policies",{keyPath:"id",autoIncrement:true});
@@ -41,54 +41,50 @@ function addPolicy(d){tx("readwrite").add(d);toast("Saved");setTimeout(renderHom
 function getLocation(){navigator.geolocation?.getCurrentPosition(p=>locationStr=`${p.coords.latitude},${p.coords.longitude}`)}
 
 function header(t,b=true){return `<div class=header>${b?`<button onclick=renderHome() class=ghost>←</button>`:""}<b>${t}</b><div></div></div>`}
+function nav(){return `<div class=nav><button onclick=renderHome()>🏠</button><button onclick=renderEmergency()>🚨</button><button onclick=renderAdd()>＋</button></div>`}
 
-function nav(){return `<div class=nav>
-<button onclick=renderHome()>🏠</button>
-<button onclick=renderEmergency()>🚨</button>
-<button onclick=renderAdd()>＋</button>
-</div>`}
-
-function renderHome(){
-getPolicies(p=>{
+function renderHome(){getPolicies(p=>{
 let h=header("Coverly",false)+`<div class=container>
 <button class=primary onclick=renderEmergency()>Emergency</button>
-<button onclick=exportQR()>Export</button>
-<button onclick=startScan()>Import</button>`;
+<button onclick=exportQR()>Export QR</button>
+<button onclick=startScan()>Import QR</button>
+<button onclick=startOCR()>Scan Document</button>`;
 if(!p.length)h+=`<div class=small>No policies yet</div>`;
 p.forEach(x=>h+=`<div class=card><div class=big>${x.type}</div>${x.number}<div class=small>${x.phone}</div></div>`);
-h+=`</div><button class=fab onclick=renderAdd()>＋</button>`+nav();
-app.innerHTML=h;
-});}
+h+=`</div>`+nav();
+app.innerHTML=h;});}
 
-function renderAdd(){
-app.innerHTML=header("Add")+`<div class=container>
+function renderAdd(){app.innerHTML=header("Add")+`<div class=container>
 <input id=type placeholder="Type">
 <input id=number placeholder="Policy">
 <input id=phone placeholder="Phone">
-<input id=contact placeholder="Emergency contact phone">
 <button class=primary onclick=save()>Save</button></div>`+nav();}
 
-function save(){contact=document.getElementById("contact").value;addPolicy({type:type.value,number:number.value,phone:phone.value})}
+function save(){addPolicy({type:type.value,number:number.value,phone:phone.value})}
 
-function renderEmergency(){
-getPolicies(p=>{
+function renderEmergency(){getPolicies(p=>{
 let h=header("Emergency")+`<div class=container>`;
 p.forEach(x=>h+=`<div class=card>
 <div class=big>${x.type}</div>
 <div class=big>${x.number}</div>
-<button class=primary onclick="call('${x.phone}')">Call</button>
+<button class=primary onclick="location.href='tel:${x.phone}'">Call</button>
 <button onclick="msg('${x.type}','${x.number}')">SMS</button>
 <button onclick="wa('${x.type}','${x.number}')">WhatsApp</button>
 </div>`);
-h+=`<div class=card><b>Steps</b><ul><li>Photos</li><li>No fault</li><li>Call</li></ul></div></div>`+nav();
-app.innerHTML=h;
-});}
+h+=`</div>`+nav();
+app.innerHTML=h;});}
 
-function call(p){location.href=`tel:${p}`}
-function msg(t,n){const m=`Emergency ${t} ${n} ${locationStr||""}`;location.href=`sms:${contact}?body=${encodeURIComponent(m)}`}
+function msg(t,n){const m=`Emergency ${t} ${n} ${locationStr||""}`;location.href=`sms:?body=${encodeURIComponent(m)}`}
 function wa(t,n){const m=`Emergency ${t} ${n} ${locationStr||""}`;window.open(`https://wa.me/?text=${encodeURIComponent(m)}`)}
 
-function exportQR(){getPolicies(p=>{QRCode.toCanvas(qrCanvas,JSON.stringify(p));app.innerHTML=header("QR")+`<div class=container></div>`;app.appendChild(qrCanvas)+nav()})}
+function exportQR(){getPolicies(p=>{
+if(!p.length){toast("No data to export");return;}
+const canvas=document.getElementById("qrCanvas");
+canvas.style.display="block";
+QRCode.toCanvas(canvas,JSON.stringify(p));
+app.innerHTML=header("QR Export")+`<div class=container><p>Scan this QR on another device</p></div>`;
+app.appendChild(canvas);
+});}
 
 function startScan(){
 app.innerHTML=header("Scan")+`<div class=container><button onclick=stop()>Close</button></div>`;
@@ -97,13 +93,33 @@ navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}}).then(s=>
 
 function stop(){stream?.getTracks().forEach(t=>t.stop());video.style.display="none";renderHome()}
 
-function scan(){
-const c=document.createElement("canvas"),ctx=c.getContext("2d");
+function scan(){const c=document.createElement("canvas"),ctx=c.getContext("2d");
 if(video.readyState===4){c.width=video.videoWidth;c.height=video.videoHeight;ctx.drawImage(video,0,0);
 const d=ctx.getImageData(0,0,c.width,c.height);
 const code=jsQR(d.data,c.width,c.height);
 if(code){JSON.parse(code.data).forEach(x=>tx("readwrite").add(x));toast("Imported");stop();return}}
 requestAnimationFrame(scan)}
+
+// OCR
+function startOCR(){document.getElementById("fileInput").click();}
+
+document.getElementById("fileInput").addEventListener("change",async e=>{
+const file=e.target.files[0];
+if(!file) return;
+toast("Scanning...");
+const { data:{ text } } = await Tesseract.recognize(file,'eng');
+
+// simple extraction
+const numberMatch=text.match(/\b\d{6,}\b/);
+const phoneMatch=text.match(/\+?\d{6,}/);
+
+type.value = "Auto";
+number.value = numberMatch?numberMatch[0]:"";
+phone.value = phoneMatch?phoneMatch[0]:"";
+
+renderAdd();
+toast("Scan complete");
+});
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
 </script></body>
