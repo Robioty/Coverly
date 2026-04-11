@@ -1,126 +1,1576 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coverly">
 <title>Coverly</title>
-<link rel="manifest" href="manifest.json"><script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script><style>
-:root{--bg:#0f172a;--card:#1e293b;--accent:#ef4444;--blue:#3b82f6}
-body{margin:0;font-family:system-ui;background:var(--bg);color:#fff}
-.header{position:sticky;top:0;background:#020617;padding:14px;display:flex;justify-content:space-between}
-.container{padding:16px;max-width:600px;margin:auto}
-.card{background:var(--card);padding:16px;border-radius:14px;margin:10px 0}
-button{width:100%;padding:14px;margin:6px 0;border:none;border-radius:12px;font-size:15px}
-.primary{background:var(--accent);color:#fff}
-.secondary{background:var(--blue);color:#fff}
-.ghost{background:#334155;color:#fff}
-.big{font-size:20px;font-weight:700}
-.small{opacity:.7;font-size:13px}
-input{width:100%;padding:12px;margin:6px 0;border-radius:10px;border:none}
-.nav{position:fixed;bottom:0;width:100%;background:#020617;display:flex}
-.nav button{flex:1;background:none;color:#fff;padding:14px}
-.toast{position:fixed;bottom:140px;left:50%;transform:translateX(-50%);background:#111;padding:10px 16px;border-radius:10px;opacity:0;transition:.3s}
-.toast.show{opacity:1}
-</style></head><body>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+/* ── Design Tokens ── */
+:root {
+  --bg: #0a0f1e;
+  --surface: #111827;
+  --card: #161d2e;
+  --card-hover: #1c2540;
+  --border: rgba(255,255,255,0.07);
+  --border-focus: rgba(99,179,237,0.5);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,0.15);
+  --blue: #3b82f6;
+  --blue-dim: rgba(59,130,246,0.15);
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,0.12);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.12);
+  --purple: #8b5cf6;
+  --text: #f1f5f9;
+  --text-2: #94a3b8;
+  --text-3: #475569;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --nav-h: 72px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 0; }
+
+/* ── Layout ── */
+#app {
+  min-height: 100dvh;
+  padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
+}
+
+.page { animation: pageIn 0.22s ease both; }
+@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.container { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+/* ── Header ── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10,15,30,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 14px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.header-title { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+.header-logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+.header-logo span { color: var(--red); }
+.btn-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 17px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.btn-icon:active { background: var(--card-hover); }
+
+/* ── Bottom Nav ── */
+.nav {
+  position: fixed;
+  bottom: 0;
+  left: 0; right: 0;
+  background: rgba(10,15,30,0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding-bottom: var(--safe-bottom);
+  z-index: 100;
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+.nav-btn.active { color: var(--text); }
+.nav-btn .nav-icon { font-size: 22px; line-height: 1; }
+.nav-btn.active .nav-icon { filter: drop-shadow(0 0 6px rgba(255,255,255,0.3)); }
+
+/* ── Buttons ── */
+button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+.btn {
+  width: 100%;
+  padding: 15px 20px;
+  margin: 6px 0;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  transition: opacity 0.15s, transform 0.1s;
+  letter-spacing: -0.1px;
+}
+.btn:active { transform: scale(0.97); opacity: 0.85; }
+
+.btn-primary { background: var(--red); color: #fff; }
+.btn-blue { background: var(--blue); color: #fff; }
+.btn-ghost { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+.btn-ghost-red { background: var(--red-dim); border: 1px solid rgba(239,68,68,0.25); color: var(--red); }
+.btn-sm {
+  width: auto;
+  padding: 9px 16px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  margin: 3px;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 10px 0;
+  overflow: hidden;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.card:active { transform: scale(0.99); }
+.card-body { padding: 16px; }
+.card-header { padding: 14px 16px 0; }
+
+/* ── Policy Card ── */
+.policy-card { cursor: pointer; }
+.policy-card:active { border-color: var(--border-focus); }
+.policy-type {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.policy-name { font-size: 19px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
+.policy-number {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--text-2);
+  background: rgba(255,255,255,0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+.policy-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+.badge-green { background: var(--green-dim); color: var(--green); }
+.badge-amber { background: var(--amber-dim); color: var(--amber); }
+.badge-red { background: var(--red-dim); color: var(--red); }
+.badge-blue { background: var(--blue-dim); color: var(--blue); }
+.policy-footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.15);
+}
+
+/* ── Inputs ── */
+.field { margin: 10px 0; }
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--border-focus);
+}
+.field select option { background: var(--surface); }
+.field textarea { resize: none; min-height: 80px; }
+.field input[type="date"] { color-scheme: dark; }
+
+/* ── Section header ── */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-3);
+  padding: 18px 0 8px;
+}
+
+/* ── Emergency ── */
+.emergency-hero {
+  background: linear-gradient(135deg, #1a0a0a 0%, #2a0f0f 100%);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  margin: 12px 0;
+  text-align: center;
+}
+.emergency-icon { font-size: 48px; margin-bottom: 8px; }
+.emergency-title { font-size: 22px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+.emergency-sub { font-size: 14px; color: var(--text-2); }
+.location-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.location-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; box-shadow: 0 0 6px var(--green); }
+
+/* ── Empty State ── */
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-2);
+}
+.empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+.empty-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.empty-text { font-size: 14px; color: var(--text-2); line-height: 1.5; }
+
+/* ── Home Hero ── */
+.home-hero {
+  background: linear-gradient(135deg, var(--card) 0%, #1a2035 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 6px;
+}
+.hero-greeting { font-size: 13px; color: var(--text-2); margin-bottom: 2px; }
+.hero-title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+.hero-count { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.hero-action-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.hero-action-btn span:first-child { font-size: 20px; }
+.hero-action-btn:active { background: rgba(255,255,255,0.1); }
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 14px);
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: rgba(30,40,60,0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 200;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Modal / Sheet ── */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 150;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  animation: fadeIn 0.2s forwards;
+}
+@keyframes fadeIn { to { opacity: 1; } }
+.sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--border);
+  padding: 0 16px calc(var(--safe-bottom) + 16px);
+  z-index: 160;
+  max-height: 90dvh;
+  overflow-y: auto;
+  animation: sheetUp 0.25s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 12px auto 16px;
+}
+.sheet-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; }
+.sheet-sub { font-size: 14px; color: var(--text-2); margin-bottom: 20px; }
+
+/* ── Detail actions row ── */
+.action-row { display: flex; gap: 8px; margin: 8px 0; }
+.action-row .btn { margin: 0; }
+
+/* ── PIN Screen ── */
+.pin-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 40px 24px;
+  gap: 0;
+}
+.pin-logo { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 6px; }
+.pin-logo span { color: var(--red); }
+.pin-sub { font-size: 15px; color: var(--text-2); margin-bottom: 40px; }
+.pin-dots { display: flex; gap: 16px; margin-bottom: 40px; }
+.pin-dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--text-3);
+  transition: background 0.15s, border-color 0.15s;
+}
+.pin-dot.filled { background: var(--text); border-color: var(--text); }
+.pin-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 300px; }
+.pin-key {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center;
+}
+.pin-key:active { background: var(--card-hover); transform: scale(0.93); }
+.pin-key.danger { color: var(--red); }
+.pin-key.confirm { color: var(--green); }
+.pin-error { color: var(--red); font-size: 14px; margin-top: -20px; margin-bottom: 20px; min-height: 20px; }
+
+/* ── QR ── */
+#qrCanvas { display: none; border-radius: 12px; max-width: 240px; margin: 0 auto; background: #fff; padding: 12px; }
+#video { display: none; width: 100%; border-radius: var(--radius); max-height: 320px; object-fit: cover; }
+
+/* ── Scan overlay ── */
+.scan-frame {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 12px 0;
+}
+.scan-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--blue);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+
+/* ── Renewal chip ── */
+.renewal-chip {
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Settings rows ── */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-label { font-size: 15px; font-weight: 500; }
+.settings-desc { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+
+/* ── Toggle ── */
+.toggle {
+  position: relative;
+  width: 46px; height: 26px;
+  flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; top: 3px;
+  background: var(--text-2);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--green-dim); border-color: var(--green); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(20px); background: var(--green); }
+
+/* ── Divider ── */
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* ── Danger zone ── */
+.danger-section { background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius); padding: 16px; margin-top: 16px; }
+.danger-title { font-size: 13px; font-weight: 700; color: var(--red); margin-bottom: 8px; letter-spacing: 0.3px; }
+
+/* ── Onboarding ── */
+.onboard-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 32px 24px calc(var(--safe-bottom) + 24px);
+}
+.onboard-step { flex: 1; display: flex; flex-direction: column; justify-content: center; animation: pageIn 0.3s ease both; }
+.onboard-icon { font-size: 64px; margin-bottom: 24px; }
+.onboard-title { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 12px; line-height: 1.2; }
+.onboard-text { font-size: 16px; color: var(--text-2); line-height: 1.6; margin-bottom: 32px; }
+.onboard-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 24px; }
+.onboard-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--text-3); transition: width 0.2s, background 0.2s; }
+.onboard-dot.active { width: 20px; background: var(--text); }
+
+/* ── Responsive ── */
+@media(min-width:600px){
+  .container { padding: 20px 24px; }
+}
+</style>
+</head>
+<body>
 <div id="app"></div>
 <div id="toast" class="toast"></div>
 <canvas id="qrCanvas"></canvas>
-<video id="video" style="width:100%;display:none"></video>
-<input type="file" id="fileInput" accept="image/*" style="display:none"><script>
-let db,stream=null,locationStr=null;
+<video id="video" playsinline autoplay muted></video>
+<input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none">
 
-const req=indexedDB.open("coverlyDB",1);
-req.onupgradeneeded=e=>e.target.result.createObjectStore("policies",{keyPath:"id",autoIncrement:true});
-req.onsuccess=e=>{db=e.target.result;getLocation();renderHome();};
+<script>
+'use strict';
 
-const tx=m=>db.transaction("policies",m).objectStore("policies");
-const toast=m=>{const t=document.getElementById("toast");t.innerText=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000);};
+/* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+let db = null;
+let stream = null;
+let locationStr = null;
+let locationName = null;
+let activeTab = 'home';
+let appPin = localStorage.getItem('coverly_pin') || null;
+let pinEnabled = localStorage.getItem('coverly_pin_enabled') === '1';
+let isUnlocked = !pinEnabled;
+let scanAnimId = null;
+let pendingOCRData = null;
+let editingPolicyId = null;
 
-function getPolicies(cb){const r=tx("readonly").getAll();r.onsuccess=()=>cb(r.result)}
-function addPolicy(d){tx("readwrite").add(d);toast("Saved");setTimeout(renderHome,200)}
+/* ═══════════════════════════════════════
+   DATABASE
+═══════════════════════════════════════ */
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('coverlyDB', 2);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('policies')) {
+        d.createObjectStore('policies', { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(); };
+    req.onerror = reject;
+  });
+}
 
-function getLocation(){navigator.geolocation?.getCurrentPosition(p=>locationStr=`${p.coords.latitude},${p.coords.longitude}`)}
+const store = (mode = 'readonly') => db.transaction('policies', mode).objectStore('policies');
 
-function header(t,b=true){return `<div class=header>${b?`<button onclick=renderHome() class=ghost>←</button>`:""}<b>${t}</b><div></div></div>`}
-function nav(){return `<div class=nav><button onclick=renderHome()>🏠</button><button onclick=renderEmergency()>🚨</button><button onclick=renderAdd()>＋</button></div>`}
+function getPolicies() {
+  return new Promise(res => {
+    const r = store().getAll();
+    r.onsuccess = () => res(r.result);
+  });
+}
 
-function renderHome(){getPolicies(p=>{
-let h=header("Coverly",false)+`<div class=container>
-<button class=primary onclick=renderEmergency()>Emergency</button>
-<button onclick=exportQR()>Export QR</button>
-<button onclick=startScan()>Import QR</button>
-<button onclick=startOCR()>Scan Document</button>`;
-if(!p.length)h+=`<div class=small>No policies yet</div>`;
-p.forEach(x=>h+=`<div class=card><div class=big>${x.type}</div>${x.number}<div class=small>${x.phone}</div></div>`);
-h+=`</div>`+nav();
-app.innerHTML=h;});}
+function addPolicy(data) {
+  return new Promise(res => {
+    const r = store('readwrite').add({ ...data, createdAt: Date.now() });
+    r.onsuccess = () => res(r.result);
+  });
+}
 
-function renderAdd(){app.innerHTML=header("Add")+`<div class=container>
-<input id=type placeholder="Type">
-<input id=number placeholder="Policy">
-<input id=phone placeholder="Phone">
-<button class=primary onclick=save()>Save</button></div>`+nav();}
+function updatePolicy(data) {
+  return new Promise(res => {
+    const r = store('readwrite').put(data);
+    r.onsuccess = () => res();
+  });
+}
 
-function save(){addPolicy({type:type.value,number:number.value,phone:phone.value})}
+function deletePolicy(id) {
+  return new Promise(res => {
+    store('readwrite').delete(id);
+    res();
+  });
+}
 
-function renderEmergency(){getPolicies(p=>{
-let h=header("Emergency")+`<div class=container>`;
-p.forEach(x=>h+=`<div class=card>
-<div class=big>${x.type}</div>
-<div class=big>${x.number}</div>
-<button class=primary onclick="location.href='tel:${x.phone}'">Call</button>
-<button onclick="msg('${x.type}','${x.number}')">SMS</button>
-<button onclick="wa('${x.type}','${x.number}')">WhatsApp</button>
-</div>`);
-h+=`</div>`+nav();
-app.innerHTML=h;});}
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+let toastTimer;
+function toast(msg, duration = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration);
+}
 
-function msg(t,n){const m=`Emergency ${t} ${n} ${locationStr||""}`;location.href=`sms:?body=${encodeURIComponent(m)}`}
-function wa(t,n){const m=`Emergency ${t} ${n} ${locationStr||""}`;window.open(`https://wa.me/?text=${encodeURIComponent(m)}`)}
+/* ═══════════════════════════════════════
+   LOCATION
+═══════════════════════════════════════ */
+function getLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      locationStr = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`;
+      // Reverse geocode with OpenStreetMap
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p.coords.latitude}&lon=${p.coords.longitude}&format=json`)
+        .then(r => r.json())
+        .then(d => {
+          locationName = d.address?.city || d.address?.town || d.address?.village || d.address?.county || 'Your location';
+          renderIfHome();
+        })
+        .catch(() => { locationName = 'Location found'; });
+    },
+    () => { locationStr = null; }
+  );
+}
 
-function exportQR(){getPolicies(p=>{
-if(!p.length){toast("No data to export");return;}
-const canvas=document.getElementById("qrCanvas");
-canvas.style.display="block";
-QRCode.toCanvas(canvas,JSON.stringify(p));
-app.innerHTML=header("QR Export")+`<div class=container><p>Scan this QR on another device</p></div>`;
-app.appendChild(canvas);
-});}
+function renderIfHome() {
+  if (activeTab === 'home') renderHome();
+}
 
-function startScan(){
-app.innerHTML=header("Scan")+`<div class=container><button onclick=stop()>Close</button></div>`;
-app.appendChild(video);video.style.display="block";
-navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}}).then(s=>{stream=s;video.srcObject=s;video.play();scan();});}
+/* ═══════════════════════════════════════
+   POLICY TYPES
+═══════════════════════════════════════ */
+const POLICY_TYPES = [
+  { key: 'car', label: 'Car Insurance', icon: '🚗' },
+  { key: 'health', label: 'Health Insurance', icon: '🏥' },
+  { key: 'home', label: 'Home Insurance', icon: '🏠' },
+  { key: 'life', label: 'Life Insurance', icon: '💚' },
+  { key: 'travel', label: 'Travel Insurance', icon: '✈️' },
+  { key: 'pet', label: 'Pet Insurance', icon: '🐾' },
+  { key: 'business', label: 'Business Insurance', icon: '💼' },
+  { key: 'other', label: 'Other', icon: '📋' },
+];
 
-function stop(){stream?.getTracks().forEach(t=>t.stop());video.style.display="none";renderHome()}
+function getPolicyMeta(key) {
+  return POLICY_TYPES.find(t => t.key === key) || { key: 'other', label: 'Insurance', icon: '📋' };
+}
 
-function scan(){const c=document.createElement("canvas"),ctx=c.getContext("2d");
-if(video.readyState===4){c.width=video.videoWidth;c.height=video.videoHeight;ctx.drawImage(video,0,0);
-const d=ctx.getImageData(0,0,c.width,c.height);
-const code=jsQR(d.data,c.width,c.height);
-if(code){JSON.parse(code.data).forEach(x=>tx("readwrite").add(x));toast("Imported");stop();return}}
-requestAnimationFrame(scan)}
+function expiryBadge(expiry) {
+  if (!expiry) return '';
+  const d = new Date(expiry);
+  const now = new Date();
+  const days = Math.ceil((d - now) / 86400000);
+  if (days < 0) return `<span class="badge badge-red">Expired</span>`;
+  if (days <= 30) return `<span class="badge badge-amber">Expires in ${days}d</span>`;
+  if (days <= 90) return `<span class="badge badge-blue">Expires in ${Math.round(days/30)}mo</span>`;
+  return `<span class="badge badge-green">Active</span>`;
+}
 
-// OCR
-function startOCR(){document.getElementById("fileInput").click();}
+/* ═══════════════════════════════════════
+   RENDER HELPERS
+═══════════════════════════════════════ */
+function headerHTML(title, showBack = true) {
+  return `<div class="header">
+    ${showBack
+      ? `<button class="btn-icon" onclick="goBack()">←</button>`
+      : `<div style="width:38px"></div>`}
+    <span class="header-title">${title}</span>
+    <div style="width:38px"></div>
+  </div>`;
+}
 
-document.getElementById("fileInput").addEventListener("change",async e=>{
-const file=e.target.files[0];
-if(!file) return;
-toast("Scanning...");
-const { data:{ text } } = await Tesseract.recognize(file,'eng');
+function homeHeaderHTML(policyCount) {
+  return `<div class="header">
+    <span class="header-logo">Cover<span>ly</span></span>
+    <div style="display:flex;gap:8px">
+      ${policyCount > 0 ? `<button class="btn-icon" onclick="exportQR()" title="Export QR">⬆️</button>` : ''}
+      <button class="btn-icon" onclick="renderSettings()" title="Settings">⚙️</button>
+    </div>
+  </div>`;
+}
 
-// simple extraction
-const numberMatch=text.match(/\b\d{6,}\b/);
-const phoneMatch=text.match(/\+?\d{6,}/);
+function navHTML(active) {
+  const tabs = [
+    { id: 'home', icon: '🏠', label: 'Vault' },
+    { id: 'emergency', icon: '🚨', label: 'Emergency' },
+    { id: 'add', icon: '＋', label: 'Add' },
+    { id: 'scan', icon: '📷', label: 'Scan' },
+  ];
+  return `<div class="nav">${tabs.map(t =>
+    `<button class="nav-btn ${active === t.id ? 'active' : ''}" onclick="navTap('${t.id}')">
+      <span class="nav-icon">${t.icon}</span>${t.label}
+    </button>`
+  ).join('')}</div>`;
+}
 
-type.value = "Auto";
-number.value = numberMatch?numberMatch[0]:"";
-phone.value = phoneMatch?phoneMatch[0]:"";
+function navTap(tab) {
+  activeTab = tab;
+  stopCamera();
+  if (tab === 'home') renderHome();
+  else if (tab === 'emergency') renderEmergency();
+  else if (tab === 'add') renderAdd();
+  else if (tab === 'scan') renderScan();
+}
 
-renderAdd();
-toast("Scan complete");
+function goBack() {
+  stopCamera();
+  activeTab = 'home';
+  renderHome();
+}
+
+/* ═══════════════════════════════════════
+   HOME
+═══════════════════════════════════════ */
+async function renderHome() {
+  activeTab = 'home';
+  const policies = await getPolicies();
+  const count = policies.length;
+
+  let html = homeHeaderHTML(count) + `<div class="container page">`;
+
+  html += `<div class="home-hero">
+    <div class="hero-greeting">Your insurance vault</div>
+    <div class="hero-title">Good ${getTimeOfDay()}</div>
+    <div class="hero-count">${count === 0 ? 'No policies stored' : `${count} polic${count === 1 ? 'y' : 'ies'} stored safely`}</div>
+    <div class="hero-actions">
+      <button class="hero-action-btn" onclick="navTap('emergency')">
+        <span>🚨</span><span>Emergency</span>
+      </button>
+      <button class="hero-action-btn" onclick="navTap('add')">
+        <span>＋</span><span>Add Policy</span>
+      </button>
+      <button class="hero-action-btn" onclick="navTap('scan')">
+        <span>📷</span><span>Scan Doc</span>
+      </button>
+      <button class="hero-action-btn" onclick="exportQR()">
+        <span>⬆️</span><span>Export QR</span>
+      </button>
+    </div>
+  </div>`;
+
+  if (locationStr) {
+    html += `<div class="location-bar">
+      <div class="location-dot"></div>
+      <span>📍 ${locationName || locationStr}</span>
+    </div>`;
+  }
+
+  if (count === 0) {
+    html += `<div class="empty">
+      <div class="empty-icon">🛡️</div>
+      <div class="empty-title">No policies yet</div>
+      <div class="empty-text">Add your first policy to keep your insurance details safe and accessible — even offline.</div>
+    </div>`;
+  } else {
+    html += `<div class="section-label">Your Policies</div>`;
+    policies.forEach(p => {
+      const meta = getPolicyMeta(p.type);
+      html += `<div class="card policy-card" onclick="renderPolicyDetail(${p.id})">
+        <div class="card-body">
+          <div class="policy-type">${meta.icon} ${meta.label}</div>
+          <div class="policy-name">${esc(p.insurer || p.type)}</div>
+          <div class="policy-number">${esc(p.number)}</div>
+          <div class="policy-badges">
+            ${expiryBadge(p.expiry)}
+            ${p.phone ? `<span class="badge badge-blue">📞 Has contact</span>` : ''}
+            ${p.emergencyContact ? `<span class="badge badge-green">👤 Emergency contact</span>` : ''}
+          </div>
+        </div>
+        <div class="policy-footer">
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();quickCall('${esc(p.phone)}')">📞 Call</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();quickSMS('${esc(p.type)}','${esc(p.number)}')">💬 SMS</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();quickWA('${esc(p.type)}','${esc(p.number)}')">📲 WA</button>
+        </div>
+      </div>`;
+    });
+  }
+
+  html += `</div>` + navHTML('home');
+  document.getElementById('app').innerHTML = html;
+}
+
+function getTimeOfDay() {
+  const h = new Date().getHours();
+  if (h < 12) return 'morning';
+  if (h < 18) return 'afternoon';
+  return 'evening';
+}
+
+/* ═══════════════════════════════════════
+   POLICY DETAIL
+═══════════════════════════════════════ */
+async function renderPolicyDetail(id) {
+  const policies = await getPolicies();
+  const p = policies.find(x => x.id === id);
+  if (!p) return;
+  const meta = getPolicyMeta(p.type);
+
+  let html = headerHTML(`${meta.icon} ${meta.label}`) + `<div class="container page">`;
+
+  html += `<div class="card">
+    <div class="card-body">
+      <div class="policy-type">Insurer</div>
+      <div class="policy-name">${esc(p.insurer || 'Unknown')}</div>
+      <div class="policy-badges">${expiryBadge(p.expiry)}</div>
+      <div class="section-label">Policy Number</div>
+      <div class="policy-number" style="font-size:15px;padding:8px 12px">${esc(p.number)}</div>
+      ${p.phone ? `<div class="section-label">Contact</div><div style="font-size:15px;margin-bottom:4px">${esc(p.phone)}</div>` : ''}
+      ${p.expiry ? `<div class="section-label">Expiry Date</div><div style="font-size:15px">${formatDate(p.expiry)}</div>` : ''}
+      ${p.emergencyContact ? `<div class="section-label">Emergency Contact</div><div style="font-size:15px">${esc(p.emergencyContact)}</div>` : ''}
+      ${p.notes ? `<div class="section-label">Notes</div><div style="font-size:14px;color:var(--text-2);line-height:1.5">${esc(p.notes)}</div>` : ''}
+    </div>
+  </div>`;
+
+  html += `<div class="section-label">Quick Actions</div>
+  <div class="action-row">
+    ${p.phone ? `<button class="btn btn-primary" onclick="quickCall('${esc(p.phone)}')">📞 Call Insurer</button>` : ''}
+  </div>
+  <div class="action-row">
+    <button class="btn btn-ghost" onclick="quickSMS('${esc(p.type)}','${esc(p.number)}')">💬 Send SMS</button>
+    <button class="btn btn-ghost" onclick="quickWA('${esc(p.type)}','${esc(p.number)}')">📲 WhatsApp</button>
+  </div>
+  <div class="action-row">
+    <button class="btn btn-ghost" onclick="sharePolicy(${p.id})">🔗 Share</button>
+    <button class="btn btn-ghost" onclick="copyPolicyText(${p.id})">📋 Copy</button>
+  </div>`;
+
+  html += `<div class="section-label">Manage</div>
+  <button class="btn btn-ghost" onclick="renderEditPolicy(${p.id})">✏️ Edit Policy</button>
+  <button class="btn btn-ghost-red" onclick="confirmDelete(${p.id})">🗑️ Delete Policy</button>`;
+
+  html += `</div>`;
+  document.getElementById('app').innerHTML = html;
+}
+
+async function copyPolicyText(id) {
+  const policies = await getPolicies();
+  const p = policies.find(x => x.id === id);
+  if (!p) return;
+  const text = `${p.insurer || p.type}\nPolicy: ${p.number}\n${p.phone ? 'Phone: ' + p.phone : ''}${p.expiry ? '\nExpiry: ' + formatDate(p.expiry) : ''}`;
+  navigator.clipboard?.writeText(text).then(() => toast('📋 Copied to clipboard'));
+}
+
+async function sharePolicy(id) {
+  const policies = await getPolicies();
+  const p = policies.find(x => x.id === id);
+  if (!p) return;
+  const text = `Insurance Details\n${p.insurer || p.type}\nPolicy: ${p.number}\n${p.phone ? 'Phone: ' + p.phone : ''}`;
+  if (navigator.share) {
+    navigator.share({ title: 'Insurance Policy', text }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(text).then(() => toast('Copied!'));
+  }
+}
+
+function confirmDelete(id) {
+  showSheet(`
+    <div class="sheet-title">Delete Policy?</div>
+    <div class="sheet-sub">This cannot be undone. The policy will be permanently removed from your device.</div>
+    <button class="btn btn-ghost-red" onclick="doDelete(${id})">🗑️ Yes, Delete</button>
+    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
+  `);
+}
+
+async function doDelete(id) {
+  await deletePolicy(id);
+  closeSheet();
+  toast('Policy deleted');
+  activeTab = 'home';
+  renderHome();
+}
+
+/* ═══════════════════════════════════════
+   ADD / EDIT POLICY
+═══════════════════════════════════════ */
+function renderAdd(prefill = {}) {
+  editingPolicyId = null;
+  activeTab = 'add';
+  const typeOptions = POLICY_TYPES.map(t =>
+    `<option value="${t.key}" ${prefill.type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`
+  ).join('');
+
+  let html = headerHTML('Add Policy') + `<div class="container page">`;
+  html += `
+    <div class="field">
+      <label>Policy Type</label>
+      <select id="f_type">${typeOptions}</select>
+    </div>
+    <div class="field">
+      <label>Insurer / Company Name</label>
+      <input id="f_insurer" placeholder="e.g. Aviva, AXA, Direct Line" value="${esc(prefill.insurer || '')}">
+    </div>
+    <div class="field">
+      <label>Policy Number</label>
+      <input id="f_number" placeholder="e.g. POL-123456" value="${esc(prefill.number || '')}">
+    </div>
+    <div class="field">
+      <label>Claims / Contact Phone</label>
+      <input id="f_phone" type="tel" placeholder="+44 800 000 0000" value="${esc(prefill.phone || '')}">
+    </div>
+    <div class="field">
+      <label>Expiry Date (optional)</label>
+      <input id="f_expiry" type="date" value="${esc(prefill.expiry || '')}">
+    </div>
+    <div class="field">
+      <label>Emergency Contact (optional)</label>
+      <input id="f_emergency" placeholder="Name or number for emergencies" value="${esc(prefill.emergencyContact || '')}">
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <textarea id="f_notes" placeholder="Excess amount, coverage details...">${esc(prefill.notes || '')}</textarea>
+    </div>
+    <button class="btn btn-primary" onclick="savePolicy()">💾 Save Policy</button>
+    <button class="btn btn-ghost" onclick="startOCR()" style="margin-top:4px">📷 Scan Document Instead</button>
+  `;
+  html += `</div>` + navHTML('add');
+  document.getElementById('app').innerHTML = html;
+}
+
+async function renderEditPolicy(id) {
+  const policies = await getPolicies();
+  const p = policies.find(x => x.id === id);
+  if (!p) return;
+  editingPolicyId = id;
+
+  const typeOptions = POLICY_TYPES.map(t =>
+    `<option value="${t.key}" ${p.type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`
+  ).join('');
+
+  let html = headerHTML('Edit Policy') + `<div class="container page">`;
+  html += `
+    <div class="field"><label>Policy Type</label><select id="f_type">${typeOptions}</select></div>
+    <div class="field"><label>Insurer / Company Name</label><input id="f_insurer" value="${esc(p.insurer || '')}"></div>
+    <div class="field"><label>Policy Number</label><input id="f_number" value="${esc(p.number || '')}"></div>
+    <div class="field"><label>Claims / Contact Phone</label><input id="f_phone" type="tel" value="${esc(p.phone || '')}"></div>
+    <div class="field"><label>Expiry Date</label><input id="f_expiry" type="date" value="${esc(p.expiry || '')}"></div>
+    <div class="field"><label>Emergency Contact</label><input id="f_emergency" value="${esc(p.emergencyContact || '')}"></div>
+    <div class="field"><label>Notes</label><textarea id="f_notes">${esc(p.notes || '')}</textarea></div>
+    <button class="btn btn-primary" onclick="savePolicy()">💾 Update Policy</button>
+  `;
+  html += `</div>`;
+  document.getElementById('app').innerHTML = html;
+}
+
+async function savePolicy() {
+  const data = {
+    type: document.getElementById('f_type').value,
+    insurer: document.getElementById('f_insurer').value.trim(),
+    number: document.getElementById('f_number').value.trim(),
+    phone: document.getElementById('f_phone').value.trim(),
+    expiry: document.getElementById('f_expiry').value,
+    emergencyContact: document.getElementById('f_emergency').value.trim(),
+    notes: document.getElementById('f_notes').value.trim(),
+  };
+
+  if (!data.number) { toast('⚠️ Policy number is required'); return; }
+
+  if (editingPolicyId) {
+    const policies = await getPolicies();
+    const existing = policies.find(x => x.id === editingPolicyId);
+    await updatePolicy({ ...existing, ...data });
+    toast('✅ Policy updated');
+  } else {
+    await addPolicy(data);
+    toast('✅ Policy saved');
+  }
+
+  editingPolicyId = null;
+  activeTab = 'home';
+  await renderHome();
+}
+
+/* ═══════════════════════════════════════
+   EMERGENCY
+═══════════════════════════════════════ */
+async function renderEmergency() {
+  activeTab = 'emergency';
+  const policies = await getPolicies();
+
+  let html = headerHTML('Emergency', false) + `<div class="container page">`;
+  html += `<div class="emergency-hero">
+    <div class="emergency-icon">🚨</div>
+    <div class="emergency-title">Emergency Mode</div>
+    <div class="emergency-sub">Call, SMS or share your policy instantly</div>
+  </div>`;
+
+  if (locationStr) {
+    html += `<div class="location-bar">
+      <div class="location-dot"></div>
+      <span>📍 ${locationName || locationStr} (${locationStr})</span>
+    </div>`;
+  } else {
+    html += `<button class="btn btn-ghost" onclick="getLocation();toast('📍 Getting location...')" style="font-size:13px;padding:10px">📍 Get My Location</button>`;
+  }
+
+  if (policies.length === 0) {
+    html += `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No policies yet</div><div class="empty-text">Add policies from the vault to use emergency features.</div></div>`;
+  } else {
+    policies.forEach(p => {
+      const meta = getPolicyMeta(p.type);
+      html += `<div class="card">
+        <div class="card-body">
+          <div class="policy-type">${meta.icon} ${meta.label}</div>
+          <div class="policy-name">${esc(p.insurer || p.type)}</div>
+          <div class="policy-number">${esc(p.number)}</div>
+          ${p.emergencyContact ? `<div style="font-size:13px;color:var(--text-2);margin-top:4px">👤 ${esc(p.emergencyContact)}</div>` : ''}
+        </div>
+        <div class="policy-footer">
+          ${p.phone ? `<button class="btn btn-primary btn-sm" onclick="quickCall('${esc(p.phone)}')">📞 Call</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="quickSMS('${esc(p.type)}','${esc(p.number)}')">💬 SMS</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickWA('${esc(p.type)}','${esc(p.number)}')">📲 WA</button>
+          ${p.emergencyContact ? `<button class="btn btn-ghost btn-sm" onclick="callContact('${esc(p.emergencyContact)}')">👤 Contact</button>` : ''}
+        </div>
+      </div>`;
+    });
+  }
+
+  html += `</div>` + navHTML('emergency');
+  document.getElementById('app').innerHTML = html;
+}
+
+function quickCall(phone) {
+  if (!phone) { toast('No phone number saved'); return; }
+  location.href = `tel:${phone}`;
+}
+
+function callContact(contact) {
+  if (contact.match(/[\d\+]/)) location.href = `tel:${contact}`;
+  else toast(`Contact: ${contact}`);
+}
+
+function buildEmergencyMsg(type, number) {
+  let m = `🚨 Emergency – Insurance needed\nType: ${type}\nPolicy: ${number}`;
+  if (locationStr) m += `\nLocation: https://maps.google.com/?q=${locationStr}`;
+  if (locationName) m += ` (${locationName})`;
+  return m;
+}
+
+function quickSMS(type, number) {
+  const m = buildEmergencyMsg(type, number);
+  location.href = `sms:?body=${encodeURIComponent(m)}`;
+}
+
+function quickWA(type, number) {
+  const m = buildEmergencyMsg(type, number);
+  window.open(`https://wa.me/?text=${encodeURIComponent(m)}`);
+}
+
+/* ═══════════════════════════════════════
+   QR EXPORT
+═══════════════════════════════════════ */
+async function exportQR() {
+  const policies = await getPolicies();
+  if (!policies.length) { toast('No policies to export'); return; }
+
+  const canvas = document.getElementById('qrCanvas');
+  const data = JSON.stringify({ coverly: true, v: 2, policies });
+
+  try {
+    await QRCode.toCanvas(canvas, data, { width: 240, margin: 2, color: { dark: '#000', light: '#fff' } });
+    canvas.style.display = 'block';
+  } catch(e) {
+    toast('Data too large for QR. Export fewer policies at once.');
+    return;
+  }
+
+  let html = headerHTML('QR Export') + `<div class="container page" style="text-align:center">
+    <p style="color:var(--text-2);font-size:14px;margin-bottom:20px">Scan this on another device with Coverly to import your policies</p>
+    <div style="display:flex;justify-content:center;margin:16px 0"></div>
+    <div class="card" style="text-align:left;margin-top:16px">
+      <div class="card-body">
+        <div class="policy-type">📦 Export contains</div>
+        <div style="font-size:15px;font-weight:600">${policies.length} polic${policies.length === 1 ? 'y' : 'ies'}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:4px">⚠️ Keep this QR code private — it contains your policy data</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" onclick="goBack()" style="margin-top:16px">← Back</button>
+  </div>`;
+
+  document.getElementById('app').innerHTML = html;
+  document.querySelector('.container div[style*="justify-content:center"]').appendChild(canvas);
+}
+
+/* ═══════════════════════════════════════
+   SCAN
+═══════════════════════════════════════ */
+function renderScan() {
+  activeTab = 'scan';
+  let html = headerHTML('Scan', false) + `<div class="container page">
+    <div class="section-label">Import QR Code</div>
+    <div class="card">
+      <div class="card-body">
+        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Point your camera at a Coverly QR code to import policies.</p>
+        <button class="btn btn-blue" onclick="startQRScan()">📷 Start QR Scanner</button>
+      </div>
+    </div>
+    <div class="section-label">Scan Insurance Document</div>
+    <div class="card">
+      <div class="card-body">
+        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Take a photo of your insurance document to automatically extract policy details using OCR.</p>
+        <button class="btn btn-ghost" onclick="startOCR()">📄 Scan Document</button>
+      </div>
+    </div>
+    <div id="scanArea"></div>
+  </div>` + navHTML('scan');
+  document.getElementById('app').innerHTML = html;
+}
+
+function startQRScan() {
+  const area = document.getElementById('scanArea');
+  if (!area) return;
+  const vid = document.getElementById('video');
+  area.innerHTML = `<div class="scan-frame"></div><button class="btn btn-ghost" onclick="stopCamera();document.getElementById('scanArea').innerHTML=''" style="margin-top:8px">✕ Cancel</button>`;
+  area.querySelector('.scan-frame').appendChild(vid);
+  vid.style.display = 'block';
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(s => {
+      stream = s;
+      vid.srcObject = s;
+      vid.play();
+      scanQRLoop();
+    })
+    .catch(() => toast('Camera permission denied'));
+}
+
+function scanQRLoop() {
+  const vid = document.getElementById('video');
+  if (!vid || !stream) return;
+  if (vid.readyState === 4) {
+    const c = document.createElement('canvas');
+    c.width = vid.videoWidth; c.height = vid.videoHeight;
+    c.getContext('2d').drawImage(vid, 0, 0);
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+    const code = jsQR(d.data, c.width, c.height);
+    if (code) {
+      stopCamera();
+      importQRData(code.data);
+      return;
+    }
+  }
+  scanAnimId = requestAnimationFrame(scanQRLoop);
+}
+
+async function importQRData(raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    const list = parsed.coverly ? parsed.policies : parsed;
+    if (!Array.isArray(list)) throw new Error();
+    for (const p of list) {
+      const { id, ...rest } = p;
+      await addPolicy(rest);
+    }
+    toast(`✅ Imported ${list.length} polic${list.length === 1 ? 'y' : 'ies'}`);
+    activeTab = 'home';
+    renderHome();
+  } catch {
+    toast('⚠️ Invalid QR code');
+    renderScan();
+  }
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (scanAnimId) { cancelAnimationFrame(scanAnimId); scanAnimId = null; }
+  const vid = document.getElementById('video');
+  if (vid) { vid.style.display = 'none'; vid.srcObject = null; }
+}
+
+/* ═══════════════════════════════════════
+   OCR
+═══════════════════════════════════════ */
+function startOCR() {
+  document.getElementById('fileInput').click();
+}
+
+document.getElementById('fileInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  showSheet(`
+    <div class="sheet-title">📄 Scanning Document</div>
+    <div class="sheet-sub">Extracting policy details from your image. This may take a moment...</div>
+    <div style="text-align:center;padding:20px;font-size:32px">⏳</div>
+  `);
+
+  try {
+    const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: () => {} });
+
+    // Smart extraction
+    const policyPatterns = [
+      /policy\s*(?:no|number|#)?[:\s]+([A-Z0-9\-\/]{5,20})/i,
+      /pol[:\s]+([A-Z0-9\-]{5,20})/i,
+    ];
+    const phonePatterns = [
+      /(?:tel|phone|call|contact)[:\s]+(\+?[\d\s\-\(\)]{8,16})/i,
+      /(\+44[\s\d\-]{9,14})/,
+      /(\+?0[\d\s\-]{9,13})/,
+    ];
+    const insurerPattern = /(?:insured\s+by|insurer|company)[:\s]+([A-Za-z\s&]+?)(?:\n|ltd|plc|insurance)/i;
+    const expiryPattern = /(?:expir(?:y|es|ation)|valid\s+until|renewal)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i;
+
+    let number = '', phone = '', insurer = '', expiry = '';
+
+    for (const r of policyPatterns) { const m = text.match(r); if (m) { number = m[1]; break; } }
+    if (!number) { const m = text.match(/\b([A-Z]{2,4}[\-\s]?\d{6,12})\b/); if (m) number = m[1]; }
+
+    for (const r of phonePatterns) { const m = text.match(r); if (m) { phone = m[1].replace(/\s+/g, ' ').trim(); break; } }
+
+    const im = text.match(insurerPattern);
+    if (im) insurer = im[1].trim();
+
+    const em = text.match(expiryPattern);
+    if (em) {
+      const parts = em[1].split(/[\/\-]/);
+      if (parts.length === 3) {
+        const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+        expiry = `${y}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+      }
+    }
+
+    closeSheet();
+    pendingOCRData = { number, phone, insurer, expiry };
+    renderAdd(pendingOCRData);
+    if (number || phone) toast('✅ Details extracted — please review');
+    else toast('⚠️ Could not extract details — fill in manually');
+
+  } catch (err) {
+    closeSheet();
+    toast('⚠️ Scan failed. Try a clearer image.');
+    renderAdd();
+  }
 });
 
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
-</script></body>
+/* ═══════════════════════════════════════
+   PIN / SECURITY
+═══════════════════════════════════════ */
+let pinBuffer = '';
+let pinMode = 'unlock'; // unlock | set | confirm
+let pinTemp = '';
+
+function renderPinScreen(mode = 'unlock') {
+  pinMode = mode;
+  pinBuffer = '';
+  pinTemp = '';
+  const titles = {
+    unlock: ['Enter PIN', 'Enter your PIN to unlock Coverly'],
+    set: ['Set a PIN', 'Choose a 4-digit PIN to secure your vault'],
+    confirm: ['Confirm PIN', 'Enter your PIN again to confirm'],
+  };
+  const [title, sub] = titles[mode];
+
+  document.getElementById('app').innerHTML = `
+    <div class="pin-screen page">
+      <div class="pin-logo">Cover<span>ly</span></div>
+      <div class="pin-sub">${sub}</div>
+      <div class="pin-dots" id="pinDots">
+        ${[0,1,2,3].map(i => `<div class="pin-dot" id="pd${i}"></div>`).join('')}
+      </div>
+      <div class="pin-error" id="pinError"></div>
+      <div class="pin-keypad">
+        ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((k,i) => {
+          if (k === '') return `<div></div>`;
+          return `<button class="pin-key ${k==='⌫'?'danger':''}" onclick="pinTap('${k}')">${k}</button>`;
+        }).join('')}
+      </div>
+      ${mode === 'unlock' ? `<button style="background:none;border:none;color:var(--text-3);font-size:13px;margin-top:24px;cursor:pointer" onclick="forgotPin()">Forgot PIN?</button>` : ''}
+    </div>
+  `;
+}
+
+function pinTap(key) {
+  if (key === '⌫') {
+    pinBuffer = pinBuffer.slice(0, -1);
+  } else {
+    if (pinBuffer.length >= 4) return;
+    pinBuffer += key;
+  }
+  updatePinDots();
+  if (pinBuffer.length === 4) setTimeout(checkPin, 100);
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById(`pd${i}`);
+    if (d) d.classList.toggle('filled', i < pinBuffer.length);
+  }
+}
+
+function checkPin() {
+  if (pinMode === 'unlock') {
+    if (pinBuffer === appPin) {
+      isUnlocked = true;
+      renderHome();
+    } else {
+      document.getElementById('pinError').textContent = '❌ Wrong PIN';
+      pinBuffer = '';
+      updatePinDots();
+    }
+  } else if (pinMode === 'set') {
+    pinTemp = pinBuffer;
+    pinBuffer = '';
+    renderPinScreen('confirm');
+  } else if (pinMode === 'confirm') {
+    if (pinBuffer === pinTemp) {
+      appPin = pinBuffer;
+      localStorage.setItem('coverly_pin', appPin);
+      localStorage.setItem('coverly_pin_enabled', '1');
+      pinEnabled = true;
+      isUnlocked = true;
+      closeSheet();
+      toast('🔐 PIN set successfully');
+      renderSettings();
+    } else {
+      document.getElementById('pinError').textContent = '❌ PINs do not match';
+      pinBuffer = '';
+      updatePinDots();
+    }
+  }
+}
+
+function forgotPin() {
+  if (confirm('This will clear all saved data and remove your PIN. Continue?')) {
+    localStorage.removeItem('coverly_pin');
+    localStorage.removeItem('coverly_pin_enabled');
+    const req = indexedDB.deleteDatabase('coverlyDB');
+    req.onsuccess = () => location.reload();
+  }
+}
+
+/* ═══════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════ */
+async function renderSettings() {
+  const policies = await getPolicies();
+
+  let html = headerHTML('Settings') + `<div class="container page">`;
+
+  html += `<div class="section-label">Security</div>
+  <div class="card">
+    <div class="card-body">
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">🔐 PIN Lock</div>
+          <div class="settings-desc">${pinEnabled ? 'Vault is locked on open' : 'No lock enabled'}</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${pinEnabled ? 'checked' : ''} onchange="togglePin(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      ${pinEnabled ? `<button class="btn btn-ghost" onclick="renderPinScreen('set')" style="margin-top:8px;font-size:13px">🔄 Change PIN</button>` : ''}
+    </div>
+  </div>`;
+
+  html += `<div class="section-label">Data</div>
+  <div class="card">
+    <div class="card-body">
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">📦 Policies stored</div>
+          <div class="settings-desc">${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} on this device</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost" onclick="exportQR()" style="margin-top:8px">⬆️ Export via QR</button>
+    </div>
+  </div>`;
+
+  html += `<div class="section-label">App</div>
+  <div class="card">
+    <div class="card-body">
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">📱 Install App</div>
+          <div class="settings-desc">Add to home screen for offline use</div>
+        </div>
+        <button class="btn-icon" onclick="promptInstall()">＋</button>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">🔒 Privacy</div>
+          <div class="settings-desc">No accounts, no cloud, all data stored locally</div>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">🌐 Offline</div>
+          <div class="settings-desc">App works fully without internet</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="section-label">About</div>
+  <div class="card">
+    <div class="card-body" style="font-size:13px;color:var(--text-2);line-height:1.6">
+      <b style="color:var(--text)">Coverly v2.0</b><br>
+      Privacy-first insurance vault. Built to work offline and keep your most important details safe.<br><br>
+      <span style="opacity:0.6">MIT License</span>
+    </div>
+  </div>`;
+
+  html += `<div class="danger-section">
+    <div class="danger-title">⚠️ DANGER ZONE</div>
+    <button class="btn btn-ghost-red" onclick="confirmClearAll()">🗑️ Delete All Data</button>
+  </div>`;
+
+  html += `</div>`;
+  document.getElementById('app').innerHTML = html;
+}
+
+function togglePin(enabled) {
+  if (enabled) {
+    renderPinScreen('set');
+  } else {
+    localStorage.removeItem('coverly_pin');
+    localStorage.removeItem('coverly_pin_enabled');
+    pinEnabled = false;
+    appPin = null;
+    toast('🔓 PIN removed');
+    renderSettings();
+  }
+}
+
+function confirmClearAll() {
+  showSheet(`
+    <div class="sheet-title">Delete All Data?</div>
+    <div class="sheet-sub">This will permanently delete ALL your policies and settings. This cannot be undone.</div>
+    <button class="btn btn-ghost-red" onclick="clearAllData()">🗑️ Yes, Delete Everything</button>
+    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
+  `);
+}
+
+function clearAllData() {
+  localStorage.clear();
+  const req = indexedDB.deleteDatabase('coverlyDB');
+  req.onsuccess = () => location.reload();
+}
+
+/* ═══════════════════════════════════════
+   SHEET / MODAL
+═══════════════════════════════════════ */
+function showSheet(innerHtml) {
+  closeSheet();
+  const backdrop = document.createElement('div');
+  backdrop.className = 'sheet-backdrop';
+  backdrop.id = 'sheetBackdrop';
+  backdrop.onclick = closeSheet;
+
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  sheet.id = 'sheet';
+  sheet.innerHTML = `<div class="sheet-handle"></div>${innerHtml}`;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+}
+
+function closeSheet() {
+  document.getElementById('sheetBackdrop')?.remove();
+  document.getElementById('sheet')?.remove();
+}
+
+/* ═══════════════════════════════════════
+   ONBOARDING
+═══════════════════════════════════════ */
+const ONBOARD_STEPS = [
+  { icon: '🛡️', title: 'Your Private\nInsurance Vault', text: 'Store all your policy details safely on your device. No accounts, no cloud, no tracking — ever.' },
+  { icon: '🚨', title: 'Emergency\nReady', text: 'In an accident? One tap to call your insurer, send your location, or message via SMS or WhatsApp.' },
+  { icon: '📷', title: 'Scan to\nAdd Policies', text: 'Photograph your insurance documents and Coverly will automatically extract your policy details.' },
+  { icon: '📡', title: 'Works\nOffline', text: "Fully functional without the internet. Your data stays on your phone where it belongs." },
+];
+
+let onboardStep = 0;
+
+function renderOnboarding() {
+  const s = ONBOARD_STEPS[onboardStep];
+  const dots = ONBOARD_STEPS.map((_, i) =>
+    `<div class="onboard-dot ${i === onboardStep ? 'active' : ''}"></div>`
+  ).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="onboard-screen">
+      <div class="onboard-step">
+        <div class="onboard-icon">${s.icon}</div>
+        <div class="onboard-title">${s.title.replace('\n', '<br>')}</div>
+        <div class="onboard-text">${s.text}</div>
+      </div>
+      <div class="onboard-dots">${dots}</div>
+      <button class="btn btn-primary" onclick="nextOnboard()">
+        ${onboardStep < ONBOARD_STEPS.length - 1 ? 'Continue →' : "Let's Go 🚀"}
+      </button>
+      ${onboardStep > 0 ? `<button class="btn btn-ghost" onclick="onboardStep--;renderOnboarding()" style="margin-top:4px">← Back</button>` : ''}
+    </div>
+  `;
+}
+
+function nextOnboard() {
+  if (onboardStep < ONBOARD_STEPS.length - 1) {
+    onboardStep++;
+    renderOnboarding();
+  } else {
+    localStorage.setItem('coverly_onboarded', '1');
+    renderHome();
+  }
+}
+
+/* ═══════════════════════════════════════
+   PWA INSTALL
+═══════════════════════════════════════ */
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+});
+
+function promptInstall() {
+  if (deferredInstall) {
+    deferredInstall.prompt();
+    deferredInstall.userChoice.then(() => { deferredInstall = null; });
+  } else {
+    toast('Open in browser and use "Add to Home Screen"');
+  }
+}
+
+/* ═══════════════════════════════════════
+   UTILS
+═══════════════════════════════════════ */
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  catch { return d; }
+}
+
+/* ═══════════════════════════════════════
+   BOOT
+═══════════════════════════════════════ */
+async function boot() {
+  await initDB();
+  getLocation();
+
+  const onboarded = localStorage.getItem('coverly_onboarded');
+  if (!onboarded) {
+    renderOnboarding();
+    return;
+  }
+
+  if (pinEnabled && !isUnlocked) {
+    renderPinScreen('unlock');
+    return;
+  }
+
+  renderHome();
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+boot();
+</script>
+</body>
 </html>
