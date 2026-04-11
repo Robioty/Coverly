@@ -1,201 +1,110 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coverly</title>
-
-<link rel="manifest" href="manifest.json">
-
-<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-
-<style>
-body { margin:0; font-family: Arial; background:#0f172a; color:white; }
-.container { padding:20px; max-width:600px; margin:auto; }
-button { width:100%; padding:18px; margin:8px 0; font-size:18px; border:none; border-radius:12px; }
-.primary { background:#ef4444; }
-.secondary { background:#3b82f6; }
-.card { background:#1e293b; padding:15px; border-radius:12px; margin-top:10px; }
-input { width:100%; padding:12px; margin:6px 0; border-radius:8px; border:none; }
-.big { font-size:26px; font-weight:bold; }
-</style>
-</head>
-
-<body>
-<div class="container" id="app"></div>
+<link rel="manifest" href="manifest.json"><script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script><style>
+:root{--bg:#0f172a;--card:#1e293b;--accent:#ef4444;--blue:#3b82f6}
+body{margin:0;font-family:system-ui;background:var(--bg);color:#fff}
+.header{position:sticky;top:0;background:#020617;padding:14px;display:flex;justify-content:space-between}
+.container{padding:16px;max-width:600px;margin:auto}
+.card{background:var(--card);padding:16px;border-radius:14px;margin:10px 0}
+button{width:100%;padding:14px;margin:6px 0;border:none;border-radius:12px;font-size:15px}
+.primary{background:var(--accent);color:#fff}
+.secondary{background:var(--blue);color:#fff}
+.ghost{background:#334155;color:#fff}
+.big{font-size:20px;font-weight:700}
+.small{opacity:.7;font-size:13px}
+input{width:100%;padding:12px;margin:6px 0;border-radius:10px;border:none}
+.fab{position:fixed;bottom:80px;right:20px;background:var(--accent);padding:16px 18px;border-radius:999px}
+.nav{position:fixed;bottom:0;width:100%;background:#020617;display:flex}
+.nav button{flex:1;background:none;color:#fff;padding:14px}
+.toast{position:fixed;bottom:140px;left:50%;transform:translateX(-50%);background:#111;padding:10px 16px;border-radius:10px;opacity:0;transition:.3s}
+.toast.show{opacity:1}
+</style></head><body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
 <canvas id="qrCanvas" style="display:none"></canvas>
-<video id="video" style="width:100%; display:none"></video>
+<video id="video" style="width:100%;display:none"></video><script>
+let db,stream=null,locationStr=null,contact="";
 
-<script>
-let db;
-let userLocation = null;
+const req=indexedDB.open("coverlyDB",1);
+req.onupgradeneeded=e=>e.target.result.createObjectStore("policies",{keyPath:"id",autoIncrement:true});
+req.onsuccess=e=>{db=e.target.result;getLocation();renderHome();};
 
-const request = indexedDB.open("coverlyDB", 1);
+const tx=m=>db.transaction("policies",m).objectStore("policies");
+const toast=m=>{const t=document.getElementById("toast");t.innerText=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000);};
 
-request.onupgradeneeded = e => {
-  db = e.target.result;
-  db.createObjectStore("policies", { keyPath: "id", autoIncrement: true });
-};
+function getPolicies(cb){const r=tx("readonly").getAll();r.onsuccess=()=>cb(r.result)}
+function addPolicy(d){tx("readwrite").add(d);toast("Saved");setTimeout(renderHome,200)}
 
-request.onsuccess = e => {
-  db = e.target.result;
-  getLocation();
-  renderHome();
-};
+function getLocation(){navigator.geolocation?.getCurrentPosition(p=>locationStr=`${p.coords.latitude},${p.coords.longitude}`)}
 
-function tx(mode){ return db.transaction("policies", mode).objectStore("policies"); }
+function header(t,b=true){return `<div class=header>${b?`<button onclick=renderHome() class=ghost>←</button>`:""}<b>${t}</b><div></div></div>`}
 
-function getPolicies(cb){
-  const req = tx("readonly").getAll();
-  req.onsuccess = () => cb(req.result);
-}
-
-function addPolicy(data){
-  tx("readwrite").add(data);
-  setTimeout(renderHome,200);
-}
-
-function getLocation(){
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      userLocation = `${pos.coords.latitude}, ${pos.coords.longitude}`;
-    });
-  }
-}
+function nav(){return `<div class=nav>
+<button onclick=renderHome()>🏠</button>
+<button onclick=renderEmergency()>🚨</button>
+<button onclick=renderAdd()>＋</button>
+</div>`}
 
 function renderHome(){
-  getPolicies(policies => {
-    let html = `
-      <h2>Coverly</h2>
-      <button class="primary" onclick="renderEmergency()">🚨 Emergency</button>
-      <button class="secondary" onclick="renderAdd()">+ Add Policy</button>
-      <button onclick="exportQR()">📤 Export QR</button>
-      <button onclick="startScanner()">📥 Import QR</button>
-    `;
-
-    policies.forEach(p => {
-      html += `
-        <div class="card">
-          <b>${p.type}</b><br>
-          ${p.number}<br>
-          <a href="tel:${p.phone}">📞 Call</a>
-        </div>
-      `;
-    });
-
-    app.innerHTML = html;
-  });
-}
+getPolicies(p=>{
+let h=header("Coverly",false)+`<div class=container>
+<button class=primary onclick=renderEmergency()>Emergency</button>
+<button onclick=exportQR()>Export</button>
+<button onclick=startScan()>Import</button>`;
+if(!p.length)h+=`<div class=small>No policies yet</div>`;
+p.forEach(x=>h+=`<div class=card><div class=big>${x.type}</div>${x.number}<div class=small>${x.phone}</div></div>`);
+h+=`</div><button class=fab onclick=renderAdd()>＋</button>`+nav();
+app.innerHTML=h;
+});}
 
 function renderAdd(){
-  app.innerHTML = `
-    <h2>Add Policy</h2>
-    <input id="type" placeholder="Type (Car, Home)">
-    <input id="number" placeholder="Policy Number">
-    <input id="phone" placeholder="Phone">
-    <button onclick="savePolicy()">Save</button>
-  `;
-}
+app.innerHTML=header("Add")+`<div class=container>
+<input id=type placeholder="Type">
+<input id=number placeholder="Policy">
+<input id=phone placeholder="Phone">
+<input id=contact placeholder="Emergency contact phone">
+<button class=primary onclick=save()>Save</button></div>`+nav();}
 
-function savePolicy(){
-  addPolicy({
-    type:type.value,
-    number:number.value,
-    phone:phone.value
-  });
-}
+function save(){contact=document.getElementById("contact").value;addPolicy({type:type.value,number:number.value,phone:phone.value})}
 
 function renderEmergency(){
-  getPolicies(policies => {
-    let html = `<h2>🚨 Emergency</h2>
-    <button onclick="renderHome()">Back</button>`;
+getPolicies(p=>{
+let h=header("Emergency")+`<div class=container>`;
+p.forEach(x=>h+=`<div class=card>
+<div class=big>${x.type}</div>
+<div class=big>${x.number}</div>
+<button class=primary onclick="call('${x.phone}')">Call</button>
+<button onclick="msg('${x.type}','${x.number}')">SMS</button>
+<button onclick="wa('${x.type}','${x.number}')">WhatsApp</button>
+</div>`);
+h+=`<div class=card><b>Steps</b><ul><li>Photos</li><li>No fault</li><li>Call</li></ul></div></div>`+nav();
+app.innerHTML=h;
+});}
 
-    policies.forEach(p => {
-      html += `
-        <div class="card">
-          <div class="big">${p.type}</div>
-          <div class="big">${p.number}</div>
-          <button class="primary" onclick="window.location='tel:${p.phone}'">Call Insurer</button>
-          <button onclick="sendMessage('${p.type}','${p.number}')">📩 Send Emergency Message</button>
-        </div>
-      `;
-    });
+function call(p){location.href=`tel:${p}`}
+function msg(t,n){const m=`Emergency ${t} ${n} ${locationStr||""}`;location.href=`sms:${contact}?body=${encodeURIComponent(m)}`}
+function wa(t,n){const m=`Emergency ${t} ${n} ${locationStr||""}`;window.open(`https://wa.me/?text=${encodeURIComponent(m)}`)}
 
-    html += `
-      <div class="card">
-        <b>Car Accident Steps:</b>
-        <ul>
-          <li>Take photos</li>
-          <li>Do not admit fault</li>
-          <li>Call insurer</li>
-        </ul>
-      </div>
-    `;
+function exportQR(){getPolicies(p=>{QRCode.toCanvas(qrCanvas,JSON.stringify(p));app.innerHTML=header("QR")+`<div class=container></div>`;app.appendChild(qrCanvas)+nav()})}
 
-    app.innerHTML = html;
-  });
-}
+function startScan(){
+app.innerHTML=header("Scan")+`<div class=container><button onclick=stop()>Close</button></div>`;
+app.appendChild(video);video.style.display="block";
+navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}}).then(s=>{stream=s;video.srcObject=s;video.play();scan();});}
 
-function sendMessage(type, number){
-  const message = `Emergency!\nType: ${type}\nPolicy: ${number}\nLocation: ${userLocation || 'unknown'}`;
-  window.location.href = `sms:?body=${encodeURIComponent(message)}`;
-}
+function stop(){stream?.getTracks().forEach(t=>t.stop());video.style.display="none";renderHome()}
 
-// QR EXPORT
-function exportQR(){
-  getPolicies(policies => {
-    const data = JSON.stringify(policies);
-    const canvas = document.getElementById("qrCanvas");
-    canvas.style.display = "block";
-    QRCode.toCanvas(canvas, data);
-    app.innerHTML = `<h2>Scan this QR</h2>`;
-    app.appendChild(canvas);
-  });
-}
+function scan(){
+const c=document.createElement("canvas"),ctx=c.getContext("2d");
+if(video.readyState===4){c.width=video.videoWidth;c.height=video.videoHeight;ctx.drawImage(video,0,0);
+const d=ctx.getImageData(0,0,c.width,c.height);
+const code=jsQR(d.data,c.width,c.height);
+if(code){JSON.parse(code.data).forEach(x=>tx("readwrite").add(x));toast("Imported");stop();return}}
+requestAnimationFrame(scan)}
 
-// QR IMPORT
-function startScanner(){
-  const video = document.getElementById("video");
-  video.style.display = "block";
-
-  navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }})
-  .then(stream => {
-    video.srcObject = stream;
-    video.play();
-    scanFrame();
-  });
-}
-
-function scanFrame(){
-  const video = document.getElementById("video");
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  if(video.readyState === video.HAVE_ENOUGH_DATA){
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video,0,0);
-
-    const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code = jsQR(img.data, canvas.width, canvas.height);
-
-    if(code){
-      const data = JSON.parse(code.data);
-      data.forEach(p => tx("readwrite").add(p));
-      video.srcObject.getTracks().forEach(t=>t.stop());
-      video.style.display="none";
-      renderHome();
-      return;
-    }
-  }
-  requestAnimationFrame(scanFrame);
-}
-
-// SERVICE WORKER
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
-}
-</script>
-</body>
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+</script></body>
 </html>
