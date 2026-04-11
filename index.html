@@ -1,19 +1,15 @@
-<!-- =========================
-Insurance Vault MVP (Enhanced)
-Files to create in your repo:
-1. index.html
-2. manifest.json
-3. sw.js
-========================= --><!-- =========================
-index.html
-========================= --><!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Insurance Vault</title>
+<title>Coverly</title>
+
 <link rel="manifest" href="manifest.json">
+
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+
 <style>
 body { margin:0; font-family: Arial; background:#0f172a; color:white; }
 .container { padding:20px; max-width:600px; margin:auto; }
@@ -25,19 +21,28 @@ input { width:100%; padding:12px; margin:6px 0; border-radius:8px; border:none; 
 .big { font-size:26px; font-weight:bold; }
 </style>
 </head>
+
 <body>
 <div class="container" id="app"></div>
 <canvas id="qrCanvas" style="display:none"></canvas>
-<video id="video" style="width:100%; display:none"></video><script>
+<video id="video" style="width:100%; display:none"></video>
+
+<script>
 let db;
-const request = indexedDB.open("vaultDB", 1);
+let userLocation = null;
+
+const request = indexedDB.open("coverlyDB", 1);
 
 request.onupgradeneeded = e => {
   db = e.target.result;
   db.createObjectStore("policies", { keyPath: "id", autoIncrement: true });
 };
 
-request.onsuccess = e => { db = e.target.result; renderHome(); };
+request.onsuccess = e => {
+  db = e.target.result;
+  getLocation();
+  renderHome();
+};
 
 function tx(mode){ return db.transaction("policies", mode).objectStore("policies"); }
 
@@ -46,12 +51,23 @@ function getPolicies(cb){
   req.onsuccess = () => cb(req.result);
 }
 
-function addPolicy(data){ tx("readwrite").add(data); setTimeout(renderHome,200); }
+function addPolicy(data){
+  tx("readwrite").add(data);
+  setTimeout(renderHome,200);
+}
+
+function getLocation(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      userLocation = `${pos.coords.latitude}, ${pos.coords.longitude}`;
+    });
+  }
+}
 
 function renderHome(){
   getPolicies(policies => {
     let html = `
-      <h2>Insurance Vault</h2>
+      <h2>Coverly</h2>
       <button class="primary" onclick="renderEmergency()">🚨 Emergency</button>
       <button class="secondary" onclick="renderAdd()">+ Add Policy</button>
       <button onclick="exportQR()">📤 Export QR</button>
@@ -68,14 +84,14 @@ function renderHome(){
       `;
     });
 
-    document.getElementById("app").innerHTML = html;
+    app.innerHTML = html;
   });
 }
 
 function renderAdd(){
   app.innerHTML = `
     <h2>Add Policy</h2>
-    <input id="type" placeholder="Type">
+    <input id="type" placeholder="Type (Car, Home)">
     <input id="number" placeholder="Policy Number">
     <input id="phone" placeholder="Phone">
     <button onclick="savePolicy()">Save</button>
@@ -92,7 +108,8 @@ function savePolicy(){
 
 function renderEmergency(){
   getPolicies(policies => {
-    let html = `<h2>🚨 Emergency</h2><button onclick="renderHome()">Back</button>`;
+    let html = `<h2>🚨 Emergency</h2>
+    <button onclick="renderHome()">Back</button>`;
 
     policies.forEach(p => {
       html += `
@@ -100,6 +117,7 @@ function renderEmergency(){
           <div class="big">${p.type}</div>
           <div class="big">${p.number}</div>
           <button class="primary" onclick="window.location='tel:${p.phone}'">Call Insurer</button>
+          <button onclick="sendMessage('${p.type}','${p.number}')">📩 Send Emergency Message</button>
         </div>
       `;
     });
@@ -119,6 +137,11 @@ function renderEmergency(){
   });
 }
 
+function sendMessage(type, number){
+  const message = `Emergency!\nType: ${type}\nPolicy: ${number}\nLocation: ${userLocation || 'unknown'}`;
+  window.location.href = `sms:?body=${encodeURIComponent(message)}`;
+}
+
 // QR EXPORT
 function exportQR(){
   getPolicies(policies => {
@@ -126,9 +149,8 @@ function exportQR(){
     const canvas = document.getElementById("qrCanvas");
     canvas.style.display = "block";
     QRCode.toCanvas(canvas, data);
-    app.innerHTML = `<h2>Scan this QR on another device</h2>`;
+    app.innerHTML = `<h2>Scan this QR</h2>`;
     app.appendChild(canvas);
-    app.innerHTML += `<button onclick="renderHome()">Done</button>`;
   });
 }
 
@@ -136,10 +158,10 @@ function exportQR(){
 function startScanner(){
   const video = document.getElementById("video");
   video.style.display = "block";
+
   navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }})
   .then(stream => {
     video.srcObject = stream;
-    video.setAttribute("playsinline", true);
     video.play();
     scanFrame();
   });
@@ -154,6 +176,7 @@ function scanFrame(){
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video,0,0);
+
     const img = ctx.getImageData(0,0,canvas.width,canvas.height);
     const code = jsQR(img.data, canvas.width, canvas.height);
 
@@ -168,3 +191,11 @@ function scanFrame(){
   }
   requestAnimationFrame(scanFrame);
 }
+
+// SERVICE WORKER
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
