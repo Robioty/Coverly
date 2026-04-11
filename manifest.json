@@ -1,21 +1,52 @@
 {
-  "name": "Coverly",
+  "name": "Coverly – Insurance Vault",
   "short_name": "Coverly",
-  "start_url": ".",
+  "description": "Privacy-first, offline insurance vault for emergencies",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
-  "description": "Emergency insurance vault",
+  "orientation": "portrait",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0a0f1e",
+  "categories": ["finance", "utilities"],
   "icons": [
     {
-      "src": "icon-192-coverly.png",
+      "src": "icons/icon-192-coverly.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "icon-512-coverly.png",
+      "src": "icons/icon-512-coverly.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/home.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Coverly Home Screen"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Emergency",
+      "short_name": "Emergency",
+      "description": "Access emergency mode",
+      "url": "/?tab=emergency",
+      "icons": [{ "src": "icons/icon-192-coverly.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Add Policy",
+      "short_name": "Add",
+      "description": "Add a new insurance policy",
+      "url": "/?tab=add",
+      "icons": [{ "src": "icons/icon-192-coverly.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }
