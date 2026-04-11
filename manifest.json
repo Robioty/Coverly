@@ -8,12 +8,12 @@
   "description": "Emergency insurance vault",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "icon-192-coverly.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "icon-512-coverly.png",
       "sizes": "512x512",
       "type": "image/png"
     }
