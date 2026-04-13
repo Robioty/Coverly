@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
 /* ── Design Tokens ── */
 :root {
@@ -526,7 +527,8 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 <div id="toast" class="toast"></div>
 <canvas id="qrCanvas"></canvas>
 <video id="video" playsinline autoplay muted></video>
-<input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="fileInput" accept="image/*,application/pdf" style="display:none">
+<input type="file" id="fileInputCamera" accept="image/*" capture="environment" style="display:none">
 
 <script>
 'use strict';
@@ -1089,20 +1091,37 @@ async function exportQR() {
 function renderScan() {
   activeTab = 'scan';
   let html = headerHTML('Scan', false) + `<div class="container page">
+
     <div class="section-label">Import QR Code</div>
     <div class="card">
       <div class="card-body">
-        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Point your camera at a Coverly QR code to import policies.</p>
+        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Point your camera at a Coverly QR code to import all policies from another device.</p>
         <button class="btn btn-blue" onclick="startQRScan()">📷 Start QR Scanner</button>
       </div>
     </div>
-    <div class="section-label">Scan Insurance Document</div>
+
+    <div class="section-label">Scan Document to Add Policy</div>
     <div class="card">
       <div class="card-body">
-        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Take a photo of your insurance document to automatically extract policy details using OCR.</p>
-        <button class="btn btn-ghost" onclick="startOCR()">📄 Scan Document</button>
+        <p style="font-size:14px;color:var(--text-2);margin-bottom:14px">Coverly will scan the document and pre-fill the policy form. Supports photos and PDFs.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="btn btn-ghost" onclick="startOCRCamera()" style="margin:0;font-size:13px">📸 Take Photo</button>
+          <button class="btn btn-ghost" onclick="startOCRFile()" style="margin:0;font-size:13px">🖼️ Choose Image</button>
+        </div>
+        <button class="btn btn-ghost" onclick="startOCRPDF()" style="margin-top:8px;font-size:13px">📄 Upload PDF</button>
       </div>
     </div>
+
+    <div class="card" style="background:var(--blue-dim);border-color:rgba(59,130,246,0.2)">
+      <div class="card-body" style="font-size:13px;color:var(--text-2);line-height:1.6">
+        <b style="color:var(--text)">💡 Tips for best results</b><br>
+        • Lay document flat in good lighting<br>
+        • Ensure text is sharp and not blurry<br>
+        • Include the full document in frame<br>
+        • Avoid shadows across the text
+      </div>
+    </div>
+
     <div id="scanArea"></div>
   </div>` + navHTML('scan');
   document.getElementById('app').innerHTML = html;
@@ -1170,69 +1189,279 @@ function stopCamera() {
 }
 
 /* ═══════════════════════════════════════
-   OCR
+   OCR — IMAGE + PDF
 ═══════════════════════════════════════ */
-function startOCR() {
+function startOCRCamera() {
+  document.getElementById('fileInputCamera').click();
+}
+function startOCRFile() {
   document.getElementById('fileInput').click();
 }
+function startOCRPDF() {
+  const input = document.getElementById('fileInput');
+  input.accept = 'application/pdf';
+  input.click();
+  // reset accept after pick
+  setTimeout(() => { input.accept = 'image/*,application/pdf'; }, 2000);
+}
+// legacy hook from Add screen button
+function startOCR() { startOCRFile(); }
 
-document.getElementById('fileInput').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  e.target.value = '';
+// ── Image preprocessing: greyscale + contrast boost ──
+function preprocessImageForOCR(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      // Scale down large images to max 2000px wide for speed
+      const MAX = 2000;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Convert to greyscale and boost contrast
+      const id = ctx.getImageData(0, 0, w, h);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const grey = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+        // contrast stretch: make light→lighter, dark→darker
+        const c = Math.min(255, Math.max(0, (grey - 128) * 1.4 + 128));
+        d[i] = d[i+1] = d[i+2] = c;
+      }
+      ctx.putImageData(id, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(resolve, 'image/png');
+    };
+    img.src = url;
+  });
+}
+
+// ── Render PDF first page to canvas blob ──
+async function pdfToImageBlob(file) {
+  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.0 }); // 2x scale for better OCR
+
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+// ── Master OCR extraction function ──
+function extractPolicyData(rawText) {
+  // Normalise: collapse multiple spaces/newlines to single space, trim
+  const text = rawText.replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
+  const flat = text.replace(/\n+/g, ' '); // single-line version for some patterns
+
+  let number = '', phone = '', insurer = '', expiry = '', type = 'other';
+
+  // ── Policy Number ──
+  // Try labelled first
+  const numPatterns = [
+    /policy\s*(?:no\.?|number|#|ref\.?)[:\s\-]*([A-Z0-9][A-Z0-9\-\/\s]{4,18})/i,
+    /(?:pol|ref|certificate)\s*(?:no\.?|number|#)?[:\s\-]*([A-Z0-9][A-Z0-9\-\/\s]{4,18})/i,
+    /(?:document|schedule)\s+(?:no\.?|number)[:\s\-]*([A-Z0-9][A-Z0-9\-\/\s]{4,18})/i,
+  ];
+  for (const r of numPatterns) {
+    const m = flat.match(r);
+    if (m) { number = m[1].replace(/\s+/g, '').trim(); break; }
+  }
+  // Fallback: any plausible policy-number-shaped string (letters + digits, 6–16 chars)
+  if (!number) {
+    const m = flat.match(/\b([A-Z]{1,4}[\-\/]?\d{5,12}[A-Z]?)\b/);
+    if (m) number = m[1];
+  }
+  if (!number) {
+    // Pure digit string 8–12 chars
+    const m = flat.match(/\b(\d{8,12})\b/);
+    if (m) number = m[1];
+  }
+
+  // ── Phone ──
+  const phonePatterns = [
+    /(?:claim|claims|phone|tel(?:ephone)?|contact|call(?:us)?|helpline|emergency)[^\d\n]{0,15}(\+?[\d][\d\s\-\(\)\.]{7,17})/i,
+    /(\+44\s?\d[\d\s\-]{8,13})/,
+    /\b(0(?:800|808|118|1\d{2}|2\d{2}|3\d{2}|7\d{3}|8\d{2}|9\d{2})\s?[\d\s\-]{6,10})\b/,
+    /(\+?1[\-\s]?\(?\d{3}\)?[\-\s]\d{3}[\-\s]\d{4})/,
+  ];
+  for (const r of phonePatterns) {
+    const m = flat.match(r);
+    if (m) {
+      phone = m[1].replace(/\s+/g, ' ').trim();
+      // Strip trailing garbage chars
+      phone = phone.replace(/[^0-9\+\(\)\-\s].*$/, '').trim();
+      break;
+    }
+  }
+
+  // ── Insurer name ──
+  const insurerPatterns = [
+    /(?:insured\s+by|insurer|underwritten\s+by|provided\s+by|issued\s+by)[:\s]+([A-Za-z][A-Za-z\s&\.\-']{2,40}?)(?:\n|Ltd|PLC|plc|Ltd\.|Inc|Limited|Insurance|Group)/i,
+    /^([A-Z][A-Za-z\s&\.]{3,35}(?:Insurance|Assurance|Mutual|Direct|Cover|Group|Life|Health))/m,
+  ];
+  for (const r of insurerPatterns) {
+    const m = text.match(r);
+    if (m) { insurer = m[1].trim().replace(/\s+/g, ' '); break; }
+  }
+
+  // ── Expiry / renewal date ──
+  const datePatterns = [
+    /(?:expir(?:y|es?|ation|ed?)|valid\s+(?:until|to)|renewal\s+(?:date)?|cover(?:age)?\s+ends?|end\s+date)[:\s\-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+    /(?:expir(?:y|es?)|renewal)[:\s\-]*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i,
+    /(?:to|until)[:\s]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i,
+  ];
+  for (const r of datePatterns) {
+    const m = flat.match(r);
+    if (m) {
+      expiry = parseDateToISO(m[1]);
+      if (expiry) break;
+    }
+  }
+
+  // ── Policy type heuristic from keywords ──
+  const lower = flat.toLowerCase();
+  if (/\b(car|motor|vehicle|auto|driving|road\s+risk)\b/.test(lower)) type = 'car';
+  else if (/\b(home|household|building|content|property|landlord)\b/.test(lower)) type = 'home';
+  else if (/\b(health|medical|dental|vision|private\s+medical)\b/.test(lower)) type = 'health';
+  else if (/\b(life|death\s+benefit|whole\s+life|term\s+life)\b/.test(lower)) type = 'life';
+  else if (/\b(travel|trip|holiday|abroad|flight)\b/.test(lower)) type = 'travel';
+  else if (/\b(pet|dog|cat|animal|vet)\b/.test(lower)) type = 'pet';
+  else if (/\b(business|liability|employer|commercial|trade)\b/.test(lower)) type = 'business';
+
+  return { number, phone, insurer, expiry, type };
+}
+
+function parseDateToISO(str) {
+  if (!str) return '';
+  // Try yyyy-mm-dd or yyyy/mm/dd first
+  let m = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  // dd/mm/yyyy or dd-mm-yyyy
+  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3];
+    return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  return '';
+}
+
+// ── Show OCR result in a reviewable sheet ──
+function showOCRResultSheet(extracted, rawText) {
+  const { number, phone, insurer, expiry, type } = extracted;
+  const hasAny = number || phone || insurer || expiry;
+  const typeOptions = POLICY_TYPES.map(t =>
+    `<option value="${t.key}" ${type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`
+  ).join('');
 
   showSheet(`
-    <div class="sheet-title">📄 Scanning Document</div>
-    <div class="sheet-sub">Extracting policy details from your image. This may take a moment...</div>
-    <div style="text-align:center;padding:20px;font-size:32px">⏳</div>
+    <div class="sheet-title">${hasAny ? '✅ Document Scanned' : '⚠️ Scan Complete'}</div>
+    <div class="sheet-sub">${hasAny
+      ? 'Review the extracted fields below and tap "Use These Details" to pre-fill the form.'
+      : 'We couldn\'t reliably extract details. You can still fill the form manually, or try a clearer image.'
+    }</div>
+
+    ${hasAny ? `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-body" style="font-size:14px;display:flex;flex-direction:column;gap:10px">
+        <div class="field" style="margin:0"><label>Policy Type (detected)</label><select id="ocr_type">${typeOptions}</select></div>
+        ${insurer ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Insurer</span><div style="font-weight:600;margin-top:2px">${esc(insurer)}</div></div>` : ''}
+        ${number ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Policy Number</span><div style="font-family:\'DM Mono\',monospace;margin-top:2px">${esc(number)}</div></div>` : ''}
+        ${phone ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Phone</span><div style="margin-top:2px">${esc(phone)}</div></div>` : ''}
+        ${expiry ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Expiry</span><div style="margin-top:2px">${formatDate(expiry)}</div></div>` : ''}
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="applyOCRResult(${JSON.stringify(extracted).replace(/"/g,'&quot;')})">✅ Use These Details</button>
+    ` : ''}
+
+    <button class="btn btn-ghost" onclick="closeSheet();renderAdd();" style="margin-top:${hasAny?'4':'0'}px">✏️ Fill In Manually</button>
+
+    <details style="margin-top:16px">
+      <summary style="font-size:12px;color:var(--text-3);cursor:pointer">Show raw OCR text</summary>
+      <div style="font-size:11px;font-family:\'DM Mono\',monospace;color:var(--text-2);background:var(--card);border-radius:8px;padding:10px;margin-top:8px;max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">${esc(rawText.slice(0,1500))}</div>
+    </details>
+  `);
+}
+
+function applyOCRResult(extracted) {
+  const typeEl = document.getElementById('ocr_type');
+  if (typeEl) extracted.type = typeEl.value;
+  closeSheet();
+  renderAdd(extracted);
+}
+
+// ── Shared OCR pipeline ──
+async function runOCR(blob, label) {
+  showSheet(`
+    <div class="sheet-title">📄 Scanning ${label}</div>
+    <div class="sheet-sub">Reading text from your document. This can take 10–30 seconds depending on the image…</div>
+    <div style="text-align:center;padding:24px 0">
+      <div style="font-size:36px;animation:spin 1.5s linear infinite;display:inline-block">⏳</div>
+    </div>
+    <style>@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}</style>
   `);
 
   try {
-    const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: () => {} });
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: () => {},
+      errorHandler: () => {},
+    });
+    await worker.setParameters({
+      tessedit_pageseg_mode: '1',   // Automatic page segmentation
+      preserve_interword_spaces: '1',
+    });
+    const { data: { text } } = await worker.recognize(blob);
+    await worker.terminate();
 
-    // Smart extraction
-    const policyPatterns = [
-      /policy\s*(?:no|number|#)?[:\s]+([A-Z0-9\-\/]{5,20})/i,
-      /pol[:\s]+([A-Z0-9\-]{5,20})/i,
-    ];
-    const phonePatterns = [
-      /(?:tel|phone|call|contact)[:\s]+(\+?[\d\s\-\(\)]{8,16})/i,
-      /(\+44[\s\d\-]{9,14})/,
-      /(\+?0[\d\s\-]{9,13})/,
-    ];
-    const insurerPattern = /(?:insured\s+by|insurer|company)[:\s]+([A-Za-z\s&]+?)(?:\n|ltd|plc|insurance)/i;
-    const expiryPattern = /(?:expir(?:y|es|ation)|valid\s+until|renewal)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i;
-
-    let number = '', phone = '', insurer = '', expiry = '';
-
-    for (const r of policyPatterns) { const m = text.match(r); if (m) { number = m[1]; break; } }
-    if (!number) { const m = text.match(/\b([A-Z]{2,4}[\-\s]?\d{6,12})\b/); if (m) number = m[1]; }
-
-    for (const r of phonePatterns) { const m = text.match(r); if (m) { phone = m[1].replace(/\s+/g, ' ').trim(); break; } }
-
-    const im = text.match(insurerPattern);
-    if (im) insurer = im[1].trim();
-
-    const em = text.match(expiryPattern);
-    if (em) {
-      const parts = em[1].split(/[\/\-]/);
-      if (parts.length === 3) {
-        const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-        expiry = `${y}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-      }
-    }
-
-    closeSheet();
-    pendingOCRData = { number, phone, insurer, expiry };
-    renderAdd(pendingOCRData);
-    if (number || phone) toast('✅ Details extracted — please review');
-    else toast('⚠️ Could not extract details — fill in manually');
-
+    const extracted = extractPolicyData(text);
+    showOCRResultSheet(extracted, text);
   } catch (err) {
     closeSheet();
-    toast('⚠️ Scan failed. Try a clearer image.');
+    toast('⚠️ Scan failed — try a clearer image');
     renderAdd();
   }
+}
+
+// ── File input handlers ──
+async function handleOCRFile(file) {
+  if (!file) return;
+  // Reset input so same file can be re-chosen
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInputCamera').value = '';
+
+  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  if (isPDF) {
+    showSheet(`<div class="sheet-title">📄 Loading PDF…</div><div style="text-align:center;padding:24px;font-size:32px">📖</div>`);
+    try {
+      const blob = await pdfToImageBlob(file);
+      await runOCR(blob, 'PDF');
+    } catch(e) {
+      closeSheet();
+      toast('⚠️ Could not read PDF — is it a scanned/image PDF?');
+    }
+  } else {
+    const processed = await preprocessImageForOCR(file);
+    await runOCR(processed, 'image');
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  handleOCRFile(e.target.files[0]);
+});
+document.getElementById('fileInputCamera').addEventListener('change', e => {
+  handleOCRFile(e.target.files[0]);
 });
 
 /* ═══════════════════════════════════════
@@ -1366,6 +1595,7 @@ async function renderSettings() {
         </div>
       </div>
       <button class="btn btn-ghost" onclick="exportQR()" style="margin-top:8px">⬆️ Export via QR</button>
+      <button class="btn btn-ghost" onclick="confirmLoadDemo()" style="margin-top:6px;font-size:13px">📋 Load Example Policies</button>
     </div>
   </div>`;
 
@@ -1509,8 +1739,72 @@ function nextOnboard() {
 }
 
 /* ═══════════════════════════════════════
-   PWA INSTALL
+   DEMO DATA
 ═══════════════════════════════════════ */
+const DEMO_POLICIES = [
+  {
+    type: 'car',
+    insurer: 'Direct Line',
+    number: 'DL-7742839',
+    phone: '0800 197 6160',
+    expiry: '2026-03-14',
+    emergencyContact: 'Sarah (wife) — 07700 900123',
+    notes: '£250 excess. Comprehensive cover. Includes European breakdown. Recovery number: 0800 587 1147',
+    createdAt: Date.now() - 86400000 * 30,
+  },
+  {
+    type: 'home',
+    insurer: 'Aviva Home Insurance',
+    number: 'AV-3312-HJKL',
+    phone: '0345 030 7093',
+    expiry: '2026-08-22',
+    emergencyContact: '',
+    notes: 'Buildings + Contents. Rebuilding value £320,000. Contents £45,000. Excess £150. 24hr emergency line for burst pipes/break-ins.',
+    createdAt: Date.now() - 86400000 * 60,
+  },
+  {
+    type: 'health',
+    insurer: 'Bupa Health',
+    number: 'BUP-4490221-A',
+    phone: '0345 609 0111',
+    expiry: '2025-12-31',
+    emergencyContact: 'Dr. Patel (GP) — 0207 111 2233',
+    notes: 'Family plan. Includes dental and optical. Pre-authorisation required for specialist referrals. Mental health cover included.',
+    createdAt: Date.now() - 86400000 * 90,
+  },
+  {
+    type: 'travel',
+    insurer: 'AXA Travel',
+    number: 'TRV-AXA-88213',
+    phone: '+44 1444 442 552',
+    expiry: '2026-06-30',
+    emergencyContact: '',
+    notes: 'Annual multi-trip policy. Worldwide including USA/Canada. 31-day max per trip. Cancellation cover £5,000. Medical £10m.',
+    createdAt: Date.now() - 86400000 * 10,
+  },
+];
+
+async function seedDemoData() {
+  for (const p of DEMO_POLICIES) {
+    await addPolicy(p);
+  }
+}
+
+async function confirmLoadDemo() {
+  showSheet(`
+    <div class="sheet-title">📋 Load Example Policies?</div>
+    <div class="sheet-sub">This will add 4 realistic example policies so you can explore all the features of Coverly. You can delete them at any time.</div>
+    <button class="btn btn-primary" onclick="doLoadDemo()">✅ Yes, load examples</button>
+    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Not now</button>
+  `);
+}
+
+async function doLoadDemo() {
+  closeSheet();
+  await seedDemoData();
+  toast('✅ 4 example policies loaded!');
+  renderHome();
+}
 let deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -1560,6 +1854,15 @@ async function boot() {
 
   if (pinEnabled && !isUnlocked) {
     renderPinScreen('unlock');
+    return;
+  }
+
+  // Seed demo data once if vault is empty and never seeded
+  const policies = await getPolicies();
+  if (policies.length === 0 && !localStorage.getItem('coverly_demo_asked')) {
+    localStorage.setItem('coverly_demo_asked', '1');
+    renderHome();
+    setTimeout(confirmLoadDemo, 600);
     return;
   }
 
