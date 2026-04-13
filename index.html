@@ -501,6 +501,127 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .danger-section { background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius); padding: 16px; margin-top: 16px; }
 .danger-title { font-size: 13px; font-weight: 700; color: var(--red); margin-bottom: 8px; letter-spacing: 0.3px; }
 
+/* ── Dashboard ── */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 16px; }
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-card.full { grid-column: 1 / -1; }
+.stat-icon { font-size: 22px; margin-bottom: 2px; }
+.stat-value { font-size: 26px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+.stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-2); }
+.stat-card.warn { background: var(--amber-dim); border-color: rgba(245,158,11,0.25); }
+.stat-card.danger { background: var(--red-dim); border-color: rgba(239,68,68,0.25); }
+.stat-card.good { background: var(--green-dim); border-color: rgba(34,197,94,0.2); }
+
+/* ── Coverage bar ── */
+.coverage-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.coverage-row:last-child { border-bottom: none; }
+.coverage-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
+.coverage-info { flex: 1; min-width: 0; }
+.coverage-name { font-size: 14px; font-weight: 600; }
+.coverage-sub { font-size: 12px; color: var(--text-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.coverage-status { flex-shrink: 0; }
+
+/* ── Timeline / Calendar ── */
+.timeline { margin: 0; }
+.timeline-month {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-3);
+  padding: 16px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.timeline-month::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.timeline-month.is-today { color: var(--blue); }
+.timeline-event {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.timeline-event:active { border-color: var(--border-focus); }
+.timeline-event-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.timeline-event-body { flex: 1; min-width: 0; }
+.timeline-event-title { font-size: 14px; font-weight: 600; }
+.timeline-event-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; line-height: 1.4; }
+.timeline-event-date { font-size: 11px; font-weight: 700; color: var(--text-3); flex-shrink: 0; text-align: right; margin-top: 2px; }
+.timeline-event.ev-expired { border-color: rgba(239,68,68,0.3); background: var(--red-dim); }
+.timeline-event.ev-urgent { border-color: rgba(245,158,11,0.3); background: var(--amber-dim); }
+.timeline-event.ev-soon { border-color: rgba(59,130,246,0.25); }
+.timeline-event.ev-renew { border-color: rgba(139,92,246,0.25); background: rgba(139,92,246,0.07); }
+
+/* ── Donut chart ── */
+.donut-wrap { display: flex; align-items: center; gap: 20px; padding: 8px 0 4px; }
+.donut-svg { flex-shrink: 0; }
+.donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.donut-legend-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.donut-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.donut-legend-label { color: var(--text-2); flex: 1; }
+.donut-legend-count { font-weight: 700; }
+
+/* ── Mini calendar grid ── */
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin: 8px 0;
+}
+.cal-day-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-3); text-align: center; padding: 4px 0; letter-spacing: 0.5px; }
+.cal-day {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  position: relative;
+  cursor: default;
+}
+.cal-day.today { background: var(--blue); color: #fff; font-weight: 700; }
+.cal-day.has-event::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.cal-day.has-event.expired-event::after { background: var(--red); }
+.cal-day.other-month { opacity: 0.25; }
+.cal-month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.cal-month-title { font-size: 15px; font-weight: 700; }
+.cal-nav-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 16px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
 /* ── Onboarding ── */
 .onboard-screen {
   display: flex;
@@ -630,6 +751,7 @@ function getLocation() {
 
 function renderIfHome() {
   if (activeTab === 'home') renderHome();
+  else if (activeTab === 'dashboard') renderDashboard();
 }
 
 /* ═══════════════════════════════════════
@@ -687,6 +809,7 @@ function homeHeaderHTML(policyCount) {
 function navHTML(active) {
   const tabs = [
     { id: 'home', icon: '🏠', label: 'Vault' },
+    { id: 'dashboard', icon: '📊', label: 'Overview' },
     { id: 'emergency', icon: '🚨', label: 'Emergency' },
     { id: 'add', icon: '＋', label: 'Add' },
     { id: 'scan', icon: '📷', label: 'Scan' },
@@ -702,6 +825,7 @@ function navTap(tab) {
   activeTab = tab;
   stopCamera();
   if (tab === 'home') renderHome();
+  else if (tab === 'dashboard') renderDashboard();
   else if (tab === 'emergency') renderEmergency();
   else if (tab === 'add') renderAdd();
   else if (tab === 'scan') renderScan();
@@ -789,6 +913,326 @@ function getTimeOfDay() {
   if (h < 12) return 'morning';
   if (h < 18) return 'afternoon';
   return 'evening';
+}
+
+/* ═══════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════ */
+let calViewYear = new Date().getFullYear();
+let calViewMonth = new Date().getMonth();
+
+async function renderDashboard() {
+  activeTab = 'dashboard';
+  const policies = await getPolicies();
+  const now = new Date();
+
+  // ── Compute stats ──
+  const withExpiry = policies.filter(p => p.expiry);
+  const expired = withExpiry.filter(p => new Date(p.expiry) < now);
+  const expiring30 = withExpiry.filter(p => { const d = daysUntil(p.expiry); return d >= 0 && d <= 30; });
+  const expiring90 = withExpiry.filter(p => { const d = daysUntil(p.expiry); return d > 30 && d <= 90; });
+  const active = withExpiry.filter(p => daysUntil(p.expiry) > 90);
+  const noExpiry = policies.filter(p => !p.expiry);
+
+  // ── Donut data ──
+  const donutData = [
+    { label: 'Active', count: active.length + noExpiry.length, color: '#22c55e' },
+    { label: 'Expiring soon', count: expiring90.length, color: '#3b82f6' },
+    { label: 'Urgent', count: expiring30.length, color: '#f59e0b' },
+    { label: 'Expired', count: expired.length, color: '#ef4444' },
+  ].filter(d => d.count > 0);
+
+  // ── Build timeline events ──
+  const events = buildTimelineEvents(policies, now);
+
+  let html = `<div class="header">
+    <span class="header-logo">Cover<span>ly</span></span>
+    <div style="display:flex;gap:8px">
+      <button class="btn-icon" onclick="renderSettings()">⚙️</button>
+    </div>
+  </div><div class="container page">`;
+
+  // ── Stats row ──
+  if (policies.length === 0) {
+    html += `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No data yet</div><div class="empty-text">Add policies to see your coverage overview and renewal calendar.</div></div>`;
+    html += `</div>` + navHTML('dashboard');
+    document.getElementById('app').innerHTML = html;
+    return;
+  }
+
+  html += `<div class="stat-grid">
+    <div class="stat-card good">
+      <div class="stat-icon">🛡️</div>
+      <div class="stat-value">${policies.length}</div>
+      <div class="stat-label">Total Policies</div>
+    </div>
+    <div class="stat-card ${expired.length > 0 ? 'danger' : expiring30.length > 0 ? 'warn' : 'good'}">
+      <div class="stat-icon">${expired.length > 0 ? '⚠️' : expiring30.length > 0 ? '🕐' : '✅'}</div>
+      <div class="stat-value" style="color:${expired.length > 0 ? 'var(--red)' : expiring30.length > 0 ? 'var(--amber)' : 'var(--green)'}">${expired.length > 0 ? expired.length : expiring30.length > 0 ? expiring30.length : active.length + noExpiry.length}</div>
+      <div class="stat-label">${expired.length > 0 ? 'Expired' : expiring30.length > 0 ? 'Urgent renewals' : 'All active'}</div>
+    </div>
+    ${expiring90.length > 0 ? `
+    <div class="stat-card warn">
+      <div class="stat-icon">📅</div>
+      <div class="stat-value" style="color:var(--amber)">${expiring90.length}</div>
+      <div class="stat-label">Renew in 90d</div>
+    </div>` : ''}
+    ${noExpiry.length > 0 ? `
+    <div class="stat-card">
+      <div class="stat-icon">❓</div>
+      <div class="stat-value">${noExpiry.length}</div>
+      <div class="stat-label">No expiry set</div>
+    </div>` : ''}
+  </div>`;
+
+  // ── Coverage overview ──
+  html += `<div class="section-label">Coverage Overview</div>
+  <div class="card">
+    <div class="card-body">`;
+
+  if (donutData.length > 1) {
+    html += buildDonutSVG(donutData, policies.length);
+  }
+
+  policies.forEach(p => {
+    const meta = getPolicyMeta(p.type);
+    const days = p.expiry ? daysUntil(p.expiry) : null;
+    let statusDot = '#22c55e', statusText = 'Active';
+    if (days !== null) {
+      if (days < 0) { statusDot = '#ef4444'; statusText = 'Expired'; }
+      else if (days <= 30) { statusDot = '#f59e0b'; statusText = `${days}d left`; }
+      else if (days <= 90) { statusDot = '#3b82f6'; statusText = `${Math.round(days/30)}mo left`; }
+      else statusText = `${formatDate(p.expiry)}`;
+    } else statusText = 'No expiry';
+
+    html += `<div class="coverage-row" onclick="renderPolicyDetail(${p.id})" style="cursor:pointer">
+      <div class="coverage-icon">${meta.icon}</div>
+      <div class="coverage-info">
+        <div class="coverage-name">${esc(p.insurer || meta.label)}</div>
+        <div class="coverage-sub">${esc(p.number)}</div>
+      </div>
+      <div class="coverage-status">
+        <span class="badge" style="background:none;color:${statusDot};border:1.5px solid ${statusDot};padding:3px 8px">${statusText}</span>
+      </div>
+    </div>`;
+  });
+
+  html += `</div></div>`;
+
+  // ── Mini Calendar ──
+  html += `<div class="section-label">Renewal Calendar</div>
+  <div class="card">
+    <div class="card-body">
+      ${buildMiniCalendar(policies)}
+    </div>
+  </div>`;
+
+  // ── Timeline ──
+  html += `<div class="section-label">Timeline</div>`;
+  if (events.length === 0) {
+    html += `<div style="font-size:14px;color:var(--text-2);padding:12px 0">No upcoming events — add expiry dates to policies to see them here.</div>`;
+  } else {
+    html += buildTimeline(events);
+  }
+
+  html += `</div>` + navHTML('dashboard');
+  document.getElementById('app').innerHTML = html;
+
+  // Re-attach calendar nav listeners (they need live DOM)
+  document.getElementById('calPrev')?.addEventListener('click', () => {
+    calViewMonth--;
+    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+    refreshCalendar(policies);
+  });
+  document.getElementById('calNext')?.addEventListener('click', () => {
+    calViewMonth++;
+    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+    refreshCalendar(policies);
+  });
+}
+
+function daysUntil(expiryStr) {
+  if (!expiryStr) return null;
+  return Math.ceil((new Date(expiryStr) - new Date()) / 86400000);
+}
+
+// ── Donut SVG ──
+function buildDonutSVG(segments, total) {
+  const size = 88, cx = 44, cy = 44, r = 32, stroke = 14;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
+  let arcs = '';
+  for (const s of segments) {
+    const pct = s.count / total;
+    const dash = pct * circ;
+    arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${stroke}"
+      stroke-dasharray="${dash} ${circ - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})" opacity="0.85"/>`;
+    offset += dash;
+  }
+
+  return `<div class="donut-wrap">
+    <svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="${stroke}"/>
+      ${arcs}
+      <text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="16" font-weight="800" font-family="DM Sans,sans-serif">${total}</text>
+      <text x="${cx}" y="${cy+14}" text-anchor="middle" dominant-baseline="middle" fill="#94a3b8" font-size="8" font-family="DM Sans,sans-serif">policies</text>
+    </svg>
+    <div class="donut-legend">
+      ${segments.map(s => `<div class="donut-legend-row">
+        <div class="donut-legend-dot" style="background:${s.color}"></div>
+        <span class="donut-legend-label">${s.label}</span>
+        <span class="donut-legend-count">${s.count}</span>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// ── Mini Calendar ──
+function buildMiniCalendar(policies) {
+  const y = calViewYear, m = calViewMonth;
+  const monthName = new Date(y, m, 1).toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+  const today = new Date();
+
+  // Map expiry dates to day numbers this month
+  const eventDays = {};
+  policies.forEach(p => {
+    if (!p.expiry) return;
+    const d = new Date(p.expiry);
+    if (d.getFullYear() === y && d.getMonth() === m) {
+      const day = d.getDate();
+      const isExpired = d < today;
+      eventDays[day] = isExpired ? 'expired' : 'upcoming';
+    }
+    // Renewal reminder: 30 days before expiry
+    const renewal = new Date(p.expiry);
+    renewal.setDate(renewal.getDate() - 30);
+    if (renewal.getFullYear() === y && renewal.getMonth() === m) {
+      const rday = renewal.getDate();
+      if (!eventDays[rday]) eventDays[rday] = 'renew';
+    }
+  });
+
+  const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const daysInPrev = new Date(y, m, 0).getDate();
+
+  const dayLabels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  let cells = dayLabels.map(l => `<div class="cal-day-label">${l}</div>`).join('');
+
+  // Leading days from prev month
+  for (let i = firstDay - 1; i >= 0; i--) {
+    cells += `<div class="cal-day other-month">${daysInPrev - i}</div>`;
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
+    const evt = eventDays[d];
+    cells += `<div class="cal-day ${isToday ? 'today' : ''} ${evt ? 'has-event' : ''} ${evt === 'expired' ? 'expired-event' : ''}" title="${evt ? (evt === 'expired' ? 'Expired' : evt === 'renew' ? 'Renewal reminder' : 'Policy expires') : ''}">${d}</div>`;
+  }
+
+  // Trailing days
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  for (let d = 1; d <= totalCells - firstDay - daysInMonth; d++) {
+    cells += `<div class="cal-day other-month">${d}</div>`;
+  }
+
+  return `
+    <div class="cal-month-nav">
+      <button class="cal-nav-btn" id="calPrev">‹</button>
+      <span class="cal-month-title">${monthName}</span>
+      <button class="cal-nav-btn" id="calNext">›</button>
+    </div>
+    <div class="cal-grid">${cells}</div>
+    <div style="display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--text-2)">
+      <span>🟡 Expires / 🔴 Expired</span>
+      <span style="color:var(--purple)">● Renew reminder</span>
+    </div>`;
+}
+
+function refreshCalendar(policies) {
+  const card = document.querySelector('.cal-grid')?.closest('.card-body');
+  if (!card) return;
+  card.innerHTML = buildMiniCalendar(policies);
+  document.getElementById('calPrev')?.addEventListener('click', () => {
+    calViewMonth--;
+    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+    refreshCalendar(policies);
+  });
+  document.getElementById('calNext')?.addEventListener('click', () => {
+    calViewMonth++;
+    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+    refreshCalendar(policies);
+  });
+}
+
+// ── Timeline events builder ──
+function buildTimelineEvents(policies, now) {
+  const events = [];
+  policies.forEach(p => {
+    const meta = getPolicyMeta(p.type);
+    if (!p.expiry) return;
+    const expDate = new Date(p.expiry);
+    const days = Math.ceil((expDate - now) / 86400000);
+
+    // Renewal reminder event (30 days before)
+    const renewDate = new Date(expDate);
+    renewDate.setDate(renewDate.getDate() - 30);
+
+    if (days < 0) {
+      events.push({ date: expDate, type: 'expired', policy: p, meta, days, label: 'Expired', color: '#ef4444', cls: 'ev-expired' });
+    } else {
+      if (days <= 30) {
+        events.push({ date: expDate, type: 'urgent', policy: p, meta, days, label: `Expires in ${days} day${days===1?'':'s'}`, color: '#f59e0b', cls: 'ev-urgent' });
+      } else {
+        events.push({ date: expDate, type: 'expiry', policy: p, meta, days, label: 'Policy expires', color: '#3b82f6', cls: '' });
+      }
+      // Only show renew reminder if it's in the future
+      if (renewDate > now && days > 30) {
+        events.push({ date: renewDate, type: 'renew', policy: p, meta, days: days - 30, label: '💡 Good time to start renewing', color: '#8b5cf6', cls: 'ev-renew' });
+      }
+    }
+  });
+
+  // Sort: expired first (most recent), then upcoming by date
+  events.sort((a, b) => {
+    if (a.type === 'expired' && b.type !== 'expired') return -1;
+    if (b.type === 'expired' && a.type !== 'expired') return 1;
+    return a.date - b.date;
+  });
+
+  return events;
+}
+
+function buildTimeline(events) {
+  let html = '<div class="timeline">';
+  let lastMonthKey = null;
+
+  events.forEach(ev => {
+    const monthKey = `${ev.date.getFullYear()}-${ev.date.getMonth()}`;
+    const isNow = new Date().getMonth() === ev.date.getMonth() && new Date().getFullYear() === ev.date.getFullYear();
+
+    if (monthKey !== lastMonthKey) {
+      lastMonthKey = monthKey;
+      const label = ev.type === 'expired' && ev.date < new Date()
+        ? ev.date.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
+        : ev.date.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+      html += `<div class="timeline-month ${isNow ? 'is-today' : ''}">${label}</div>`;
+    }
+
+    const dateStr = ev.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+    html += `<div class="timeline-event ${ev.cls}" onclick="renderPolicyDetail(${ev.policy.id})">
+      <div class="timeline-event-dot" style="background:${ev.color}"></div>
+      <div class="timeline-event-body">
+        <div class="timeline-event-title">${ev.meta.icon} ${esc(ev.policy.insurer || ev.meta.label)}</div>
+        <div class="timeline-event-sub">${ev.label}${ev.type === 'renew' ? ' — policy renews 30 days later' : ''}</div>
+      </div>
+      <div class="timeline-event-date">${dateStr}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  return html;
 }
 
 /* ═══════════════════════════════════════
