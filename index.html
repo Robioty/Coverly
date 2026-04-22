@@ -641,6 +641,41 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 @media(min-width:600px){
   .container { padding: 20px 24px; }
 }
+
+/* ── Backup banner ── */
+.backup-banner {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 10px);
+  left: 12px; right: 12px;
+  background: rgba(22, 29, 46, 0.97);
+  border: 1px solid rgba(99,179,237,0.3);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1) both;
+  backdrop-filter: blur(16px);
+}
+@keyframes slideUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: none; } }
+.backup-banner-icon { font-size: 24px; flex-shrink: 0; }
+.backup-banner-text { flex: 1; min-width: 0; }
+.backup-banner-title { font-size: 14px; font-weight: 700; }
+.backup-banner-sub { font-size: 12px; color: var(--text-2); margin-top: 1px; }
+.backup-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.backup-banner-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+}
+.backup-banner-btn.primary { background: var(--blue); color: #fff; }
+.backup-banner-btn.ghost { background: rgba(255,255,255,0.08); color: var(--text-2); }
 </style>
 </head>
 <body>
@@ -650,6 +685,7 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 <video id="video" playsinline autoplay muted></video>
 <input type="file" id="fileInput" accept="image/*,application/pdf" style="display:none">
 <input type="file" id="fileInputCamera" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="restoreInput" accept=".coverly,.json" style="display:none">
 
 <script>
 'use strict';
@@ -2029,7 +2065,7 @@ async function renderSettings() {
     </div>
   </div>`;
 
-  html += `<div class="section-label">Data</div>
+  html += `<div class="section-label">Backup & Restore</div>
   <div class="card">
     <div class="card-body">
       <div class="settings-row">
@@ -2038,8 +2074,26 @@ async function renderSettings() {
           <div class="settings-desc">${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} on this device</div>
         </div>
       </div>
-      <button class="btn btn-ghost" onclick="exportQR()" style="margin-top:8px">⬆️ Export via QR</button>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">🕐 Last backup</div>
+          <div class="settings-desc">${(() => {
+            const t = parseInt(localStorage.getItem('coverly_last_backup') || '0', 10);
+            if (!t) return '<span style="color:var(--amber)">Never backed up</span>';
+            const days = Math.floor((Date.now() - t) / 86400000);
+            if (days === 0) return 'Today';
+            if (days === 1) return 'Yesterday';
+            return `${days} days ago`;
+          })()}</div>
+        </div>
+      </div>
+      <button class="btn btn-blue" onclick="startBackup()" style="margin-top:10px">⬇️ Back Up Now</button>
+      <button class="btn btn-ghost" onclick="startRestore()" style="margin-top:6px">📂 Restore from Backup</button>
+      <button class="btn btn-ghost" onclick="exportQR()" style="margin-top:6px;font-size:13px">⬆️ Export via QR</button>
       <button class="btn btn-ghost" onclick="confirmLoadDemo()" style="margin-top:6px;font-size:13px">📋 Load Example Policies</button>
+      <div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6">
+        🔐 Backups are encrypted with your password on-device. Coverly never sees your data or password.
+      </div>
     </div>
   </div>`;
 
@@ -2284,8 +2338,237 @@ function formatDate(d) {
 }
 
 /* ═══════════════════════════════════════
-   BOOT
+   ENCRYPTED BACKUP & RESTORE
 ═══════════════════════════════════════ */
+
+// ── Crypto helpers (Web Crypto API — all on-device, no network) ──
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptData(plaintext, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await deriveKey(password, salt);
+  const enc  = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, enc.encode(plaintext)
+  );
+  // Pack: magic(8) + version(1) + salt(16) + iv(12) + ciphertext
+  const magic = new TextEncoder().encode('COVERLY1');
+  const buf = new Uint8Array(8 + 1 + 16 + 12 + ciphertext.byteLength);
+  buf.set(magic, 0);
+  buf.set([1], 8);          // version byte
+  buf.set(salt, 9);
+  buf.set(iv, 25);
+  buf.set(new Uint8Array(ciphertext), 37);
+  return buf;
+}
+
+async function decryptData(buf, password) {
+  const magic = new TextDecoder().decode(buf.slice(0, 8));
+  if (magic !== 'COVERLY1') throw new Error('Not a valid Coverly backup file');
+  const salt       = buf.slice(9, 25);
+  const iv         = buf.slice(25, 37);
+  const ciphertext = buf.slice(37);
+  const key        = await deriveKey(password, salt);
+  const plainBuf   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new TextDecoder().decode(plainBuf);
+}
+
+// ── Export backup ──
+async function startBackup() {
+  showSheet(`
+    <div class="sheet-title">🔐 Create Encrypted Backup</div>
+    <div class="sheet-sub">Choose a password to encrypt your backup file. You'll need this password to restore your data — there's no way to recover it if forgotten.</div>
+    <div class="field"><label>Backup Password</label><input id="bp1" type="password" placeholder="Choose a strong password" autocomplete="new-password"></div>
+    <div class="field"><label>Confirm Password</label><input id="bp2" type="password" placeholder="Enter again to confirm" autocomplete="new-password"></div>
+    <div id="backupErr" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <button class="btn btn-primary" onclick="doBackup()">⬇️ Download Backup File</button>
+    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
+    <div style="font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6">
+      💡 Save the downloaded <b>.coverly</b> file to your Google Drive, iCloud, email, or USB — wherever you keep important files. Coverly never sees it.
+    </div>
+  `);
+}
+
+async function doBackup() {
+  const p1 = document.getElementById('bp1')?.value;
+  const p2 = document.getElementById('bp2')?.value;
+  const errEl = document.getElementById('backupErr');
+
+  if (!p1 || p1.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+  if (p1 !== p2) { errEl.textContent = 'Passwords do not match'; return; }
+
+  errEl.textContent = '';
+  const btn = document.querySelector('#sheet .btn-primary');
+  if (btn) { btn.textContent = '⏳ Encrypting…'; btn.disabled = true; }
+
+  try {
+    const policies = await getPolicies();
+    const payload = JSON.stringify({ coverly: true, v: 3, exportedAt: Date.now(), policies });
+    const encrypted = await encryptData(payload, p1);
+
+    // Download
+    const blob = new Blob([encrypted], { type: 'application/octet-stream' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    a.href     = url;
+    a.download = `coverly-backup-${date}.coverly`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Record last backup time
+    localStorage.setItem('coverly_last_backup', Date.now().toString());
+    closeSheet();
+    toast('✅ Backup downloaded!', 3000);
+  } catch (err) {
+    if (btn) { btn.textContent = '⬇️ Download Backup File'; btn.disabled = false; }
+    errEl.textContent = 'Encryption failed — please try again';
+  }
+}
+
+// ── Restore backup ──
+function startRestore() {
+  showSheet(`
+    <div class="sheet-title">📂 Restore from Backup</div>
+    <div class="sheet-sub">Select your <b>.coverly</b> backup file and enter the password you used when you created it.</div>
+    <div class="field"><label>Backup File</label>
+      <button class="btn btn-ghost" onclick="document.getElementById('restoreInput').click()" style="text-align:left">
+        📁 Choose .coverly file
+      </button>
+      <div id="restoreFileName" style="font-size:12px;color:var(--text-2);margin-top:6px"></div>
+    </div>
+    <div class="field"><label>Backup Password</label><input id="rp" type="password" placeholder="Enter your backup password" autocomplete="current-password"></div>
+    <div id="restoreErr" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <button class="btn btn-primary" id="restoreBtn" onclick="doRestore()">🔓 Restore Policies</button>
+    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
+    <div style="font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6">
+      ⚠️ Restoring will <b>add</b> policies from the backup to your current vault. It won't delete existing policies.
+    </div>
+  `);
+}
+
+let restoreFileBuffer = null;
+
+document.getElementById('restoreInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const nameEl = document.getElementById('restoreFileName');
+  if (nameEl) nameEl.textContent = `📎 ${file.name}`;
+  restoreFileBuffer = await file.arrayBuffer();
+});
+
+async function doRestore() {
+  const password = document.getElementById('rp')?.value;
+  const errEl    = document.getElementById('restoreErr');
+
+  if (!restoreFileBuffer) { errEl.textContent = 'Please choose a backup file first'; return; }
+  if (!password)          { errEl.textContent = 'Please enter your backup password'; return; }
+
+  const btn = document.getElementById('restoreBtn');
+  if (btn) { btn.textContent = '⏳ Decrypting…'; btn.disabled = true; }
+  errEl.textContent = '';
+
+  try {
+    const buf  = new Uint8Array(restoreFileBuffer);
+    const json = await decryptData(buf, password);
+    const data = JSON.parse(json);
+    const list = data.policies || (Array.isArray(data) ? data : null);
+    if (!list) throw new Error('Invalid backup structure');
+
+    for (const p of list) {
+      const { id, ...rest } = p;
+      await addPolicy(rest);
+    }
+
+    restoreFileBuffer = null;
+    localStorage.setItem('coverly_last_backup', Date.now().toString());
+    closeSheet();
+    toast(`✅ Restored ${list.length} polic${list.length === 1 ? 'y' : 'ies'}`, 3000);
+    activeTab = 'home';
+    renderHome();
+  } catch (err) {
+    if (btn) { btn.textContent = '🔓 Restore Policies'; btn.disabled = false; }
+    if (err.message?.includes('valid Coverly')) {
+      errEl.textContent = 'This does not look like a Coverly backup file';
+    } else {
+      errEl.textContent = 'Wrong password or corrupted file';
+    }
+  }
+}
+
+// ── Backup prompt logic ──
+// Shows a gentle non-blocking banner when:
+//  • User is online
+//  • There are policies to back up
+//  • It's been 14+ days since last backup (or never backed up)
+//  • The banner hasn't been dismissed in this session
+let backupBannerShown = false;
+
+async function maybeShowBackupPrompt() {
+  if (backupBannerShown) return;
+  if (!navigator.onLine) return;
+
+  const policies = await getPolicies();
+  if (policies.length === 0) return;
+
+  const lastBackup = parseInt(localStorage.getItem('coverly_last_backup') || '0', 10);
+  const daysSince  = lastBackup ? (Date.now() - lastBackup) / 86400000 : Infinity;
+
+  if (daysSince < 14) return;
+
+  backupBannerShown = true;
+  showBackupBanner(lastBackup);
+}
+
+function showBackupBanner(lastBackup) {
+  // Remove any existing banner
+  document.getElementById('backupBanner')?.remove();
+
+  const sub = lastBackup
+    ? `Last backup: ${new Date(lastBackup).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}`
+    : 'You haven\'t backed up yet';
+
+  const banner = document.createElement('div');
+  banner.className = 'backup-banner';
+  banner.id = 'backupBanner';
+  banner.innerHTML = `
+    <div class="backup-banner-icon">☁️</div>
+    <div class="backup-banner-text">
+      <div class="backup-banner-title">Back up your vault</div>
+      <div class="backup-banner-sub">${sub}</div>
+    </div>
+    <div class="backup-banner-actions">
+      <button class="backup-banner-btn primary" onclick="dismissBackupBanner();startBackup()">Back up</button>
+      <button class="backup-banner-btn ghost" onclick="dismissBackupBanner()">Later</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+}
+
+function dismissBackupBanner() {
+  const b = document.getElementById('backupBanner');
+  if (b) {
+    b.style.animation = 'none';
+    b.style.opacity = '0';
+    b.style.transform = 'translateY(16px)';
+    b.style.transition = 'opacity 0.2s, transform 0.2s';
+    setTimeout(() => b.remove(), 200);
+  }
+}
 async function boot() {
   await initDB();
   getLocation();
@@ -2310,7 +2593,9 @@ async function boot() {
     return;
   }
 
-  renderHome();
+  await renderHome();
+  // Show backup banner after a short delay so home renders first
+  setTimeout(maybeShowBackupPrompt, 1200);
 }
 
 if ('serviceWorker' in navigator) {
