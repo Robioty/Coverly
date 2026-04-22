@@ -14,7 +14,6 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
 /* ── Design Tokens ── */
 :root {
@@ -501,127 +500,6 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .danger-section { background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius); padding: 16px; margin-top: 16px; }
 .danger-title { font-size: 13px; font-weight: 700; color: var(--red); margin-bottom: 8px; letter-spacing: 0.3px; }
 
-/* ── Dashboard ── */
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 16px; }
-.stat-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stat-card.full { grid-column: 1 / -1; }
-.stat-icon { font-size: 22px; margin-bottom: 2px; }
-.stat-value { font-size: 26px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
-.stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-2); }
-.stat-card.warn { background: var(--amber-dim); border-color: rgba(245,158,11,0.25); }
-.stat-card.danger { background: var(--red-dim); border-color: rgba(239,68,68,0.25); }
-.stat-card.good { background: var(--green-dim); border-color: rgba(34,197,94,0.2); }
-
-/* ── Coverage bar ── */
-.coverage-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-.coverage-row:last-child { border-bottom: none; }
-.coverage-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
-.coverage-info { flex: 1; min-width: 0; }
-.coverage-name { font-size: 14px; font-weight: 600; }
-.coverage-sub { font-size: 12px; color: var(--text-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.coverage-status { flex-shrink: 0; }
-
-/* ── Timeline / Calendar ── */
-.timeline { margin: 0; }
-.timeline-month {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-3);
-  padding: 16px 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.timeline-month::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-.timeline-month.is-today { color: var(--blue); }
-.timeline-event {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px 14px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-.timeline-event:active { border-color: var(--border-focus); }
-.timeline-event-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 4px;
-}
-.timeline-event-body { flex: 1; min-width: 0; }
-.timeline-event-title { font-size: 14px; font-weight: 600; }
-.timeline-event-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; line-height: 1.4; }
-.timeline-event-date { font-size: 11px; font-weight: 700; color: var(--text-3); flex-shrink: 0; text-align: right; margin-top: 2px; }
-.timeline-event.ev-expired { border-color: rgba(239,68,68,0.3); background: var(--red-dim); }
-.timeline-event.ev-urgent { border-color: rgba(245,158,11,0.3); background: var(--amber-dim); }
-.timeline-event.ev-soon { border-color: rgba(59,130,246,0.25); }
-.timeline-event.ev-renew { border-color: rgba(139,92,246,0.25); background: rgba(139,92,246,0.07); }
-
-/* ── Donut chart ── */
-.donut-wrap { display: flex; align-items: center; gap: 20px; padding: 8px 0 4px; }
-.donut-svg { flex-shrink: 0; }
-.donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.donut-legend-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.donut-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.donut-legend-label { color: var(--text-2); flex: 1; }
-.donut-legend-count { font-weight: 700; }
-
-/* ── Mini calendar grid ── */
-.cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-  margin: 8px 0;
-}
-.cal-day-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-3); text-align: center; padding: 4px 0; letter-spacing: 0.5px; }
-.cal-day {
-  aspect-ratio: 1;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-2);
-  position: relative;
-  cursor: default;
-}
-.cal-day.today { background: var(--blue); color: #fff; font-weight: 700; }
-.cal-day.has-event::after {
-  content: '';
-  position: absolute;
-  bottom: 3px;
-  left: 50%; transform: translateX(-50%);
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--amber);
-}
-.cal-day.has-event.expired-event::after { background: var(--red); }
-.cal-day.other-month { opacity: 0.25; }
-.cal-month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.cal-month-title { font-size: 15px; font-weight: 700; }
-.cal-nav-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 16px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-
 /* ── Onboarding ── */
 .onboard-screen {
   display: flex;
@@ -641,41 +519,6 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 @media(min-width:600px){
   .container { padding: 20px 24px; }
 }
-
-/* ── Backup banner ── */
-.backup-banner {
-  position: fixed;
-  bottom: calc(var(--nav-h) + var(--safe-bottom) + 10px);
-  left: 12px; right: 12px;
-  background: rgba(22, 29, 46, 0.97);
-  border: 1px solid rgba(99,179,237,0.3);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  z-index: 120;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1) both;
-  backdrop-filter: blur(16px);
-}
-@keyframes slideUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: none; } }
-.backup-banner-icon { font-size: 24px; flex-shrink: 0; }
-.backup-banner-text { flex: 1; min-width: 0; }
-.backup-banner-title { font-size: 14px; font-weight: 700; }
-.backup-banner-sub { font-size: 12px; color: var(--text-2); margin-top: 1px; }
-.backup-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.backup-banner-btn {
-  padding: 7px 12px;
-  border-radius: 8px;
-  border: none;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: 'DM Sans', sans-serif;
-  cursor: pointer;
-}
-.backup-banner-btn.primary { background: var(--blue); color: #fff; }
-.backup-banner-btn.ghost { background: rgba(255,255,255,0.08); color: var(--text-2); }
 </style>
 </head>
 <body>
@@ -683,9 +526,7 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 <div id="toast" class="toast"></div>
 <canvas id="qrCanvas"></canvas>
 <video id="video" playsinline autoplay muted></video>
-<input type="file" id="fileInput" accept="image/*,application/pdf" style="display:none">
-<input type="file" id="fileInputCamera" accept="image/*" capture="environment" style="display:none">
-<input type="file" id="restoreInput" accept=".coverly,.json" style="display:none">
+<input type="file" id="fileInput" accept="image/*" capture="environment" style="display:none">
 
 <script>
 'use strict';
@@ -787,7 +628,6 @@ function getLocation() {
 
 function renderIfHome() {
   if (activeTab === 'home') renderHome();
-  else if (activeTab === 'dashboard') renderDashboard();
 }
 
 /* ═══════════════════════════════════════
@@ -845,7 +685,6 @@ function homeHeaderHTML(policyCount) {
 function navHTML(active) {
   const tabs = [
     { id: 'home', icon: '🏠', label: 'Vault' },
-    { id: 'dashboard', icon: '📊', label: 'Overview' },
     { id: 'emergency', icon: '🚨', label: 'Emergency' },
     { id: 'add', icon: '＋', label: 'Add' },
     { id: 'scan', icon: '📷', label: 'Scan' },
@@ -861,7 +700,6 @@ function navTap(tab) {
   activeTab = tab;
   stopCamera();
   if (tab === 'home') renderHome();
-  else if (tab === 'dashboard') renderDashboard();
   else if (tab === 'emergency') renderEmergency();
   else if (tab === 'add') renderAdd();
   else if (tab === 'scan') renderScan();
@@ -949,326 +787,6 @@ function getTimeOfDay() {
   if (h < 12) return 'morning';
   if (h < 18) return 'afternoon';
   return 'evening';
-}
-
-/* ═══════════════════════════════════════
-   DASHBOARD
-═══════════════════════════════════════ */
-let calViewYear = new Date().getFullYear();
-let calViewMonth = new Date().getMonth();
-
-async function renderDashboard() {
-  activeTab = 'dashboard';
-  const policies = await getPolicies();
-  const now = new Date();
-
-  // ── Compute stats ──
-  const withExpiry = policies.filter(p => p.expiry);
-  const expired = withExpiry.filter(p => new Date(p.expiry) < now);
-  const expiring30 = withExpiry.filter(p => { const d = daysUntil(p.expiry); return d >= 0 && d <= 30; });
-  const expiring90 = withExpiry.filter(p => { const d = daysUntil(p.expiry); return d > 30 && d <= 90; });
-  const active = withExpiry.filter(p => daysUntil(p.expiry) > 90);
-  const noExpiry = policies.filter(p => !p.expiry);
-
-  // ── Donut data ──
-  const donutData = [
-    { label: 'Active', count: active.length + noExpiry.length, color: '#22c55e' },
-    { label: 'Expiring soon', count: expiring90.length, color: '#3b82f6' },
-    { label: 'Urgent', count: expiring30.length, color: '#f59e0b' },
-    { label: 'Expired', count: expired.length, color: '#ef4444' },
-  ].filter(d => d.count > 0);
-
-  // ── Build timeline events ──
-  const events = buildTimelineEvents(policies, now);
-
-  let html = `<div class="header">
-    <span class="header-logo">Cover<span>ly</span></span>
-    <div style="display:flex;gap:8px">
-      <button class="btn-icon" onclick="renderSettings()">⚙️</button>
-    </div>
-  </div><div class="container page">`;
-
-  // ── Stats row ──
-  if (policies.length === 0) {
-    html += `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No data yet</div><div class="empty-text">Add policies to see your coverage overview and renewal calendar.</div></div>`;
-    html += `</div>` + navHTML('dashboard');
-    document.getElementById('app').innerHTML = html;
-    return;
-  }
-
-  html += `<div class="stat-grid">
-    <div class="stat-card good">
-      <div class="stat-icon">🛡️</div>
-      <div class="stat-value">${policies.length}</div>
-      <div class="stat-label">Total Policies</div>
-    </div>
-    <div class="stat-card ${expired.length > 0 ? 'danger' : expiring30.length > 0 ? 'warn' : 'good'}">
-      <div class="stat-icon">${expired.length > 0 ? '⚠️' : expiring30.length > 0 ? '🕐' : '✅'}</div>
-      <div class="stat-value" style="color:${expired.length > 0 ? 'var(--red)' : expiring30.length > 0 ? 'var(--amber)' : 'var(--green)'}">${expired.length > 0 ? expired.length : expiring30.length > 0 ? expiring30.length : active.length + noExpiry.length}</div>
-      <div class="stat-label">${expired.length > 0 ? 'Expired' : expiring30.length > 0 ? 'Urgent renewals' : 'All active'}</div>
-    </div>
-    ${expiring90.length > 0 ? `
-    <div class="stat-card warn">
-      <div class="stat-icon">📅</div>
-      <div class="stat-value" style="color:var(--amber)">${expiring90.length}</div>
-      <div class="stat-label">Renew in 90d</div>
-    </div>` : ''}
-    ${noExpiry.length > 0 ? `
-    <div class="stat-card">
-      <div class="stat-icon">❓</div>
-      <div class="stat-value">${noExpiry.length}</div>
-      <div class="stat-label">No expiry set</div>
-    </div>` : ''}
-  </div>`;
-
-  // ── Coverage overview ──
-  html += `<div class="section-label">Coverage Overview</div>
-  <div class="card">
-    <div class="card-body">`;
-
-  if (donutData.length > 1) {
-    html += buildDonutSVG(donutData, policies.length);
-  }
-
-  policies.forEach(p => {
-    const meta = getPolicyMeta(p.type);
-    const days = p.expiry ? daysUntil(p.expiry) : null;
-    let statusDot = '#22c55e', statusText = 'Active';
-    if (days !== null) {
-      if (days < 0) { statusDot = '#ef4444'; statusText = 'Expired'; }
-      else if (days <= 30) { statusDot = '#f59e0b'; statusText = `${days}d left`; }
-      else if (days <= 90) { statusDot = '#3b82f6'; statusText = `${Math.round(days/30)}mo left`; }
-      else statusText = `${formatDate(p.expiry)}`;
-    } else statusText = 'No expiry';
-
-    html += `<div class="coverage-row" onclick="renderPolicyDetail(${p.id})" style="cursor:pointer">
-      <div class="coverage-icon">${meta.icon}</div>
-      <div class="coverage-info">
-        <div class="coverage-name">${esc(p.insurer || meta.label)}</div>
-        <div class="coverage-sub">${esc(p.number)}</div>
-      </div>
-      <div class="coverage-status">
-        <span class="badge" style="background:none;color:${statusDot};border:1.5px solid ${statusDot};padding:3px 8px">${statusText}</span>
-      </div>
-    </div>`;
-  });
-
-  html += `</div></div>`;
-
-  // ── Mini Calendar ──
-  html += `<div class="section-label">Renewal Calendar</div>
-  <div class="card">
-    <div class="card-body">
-      ${buildMiniCalendar(policies)}
-    </div>
-  </div>`;
-
-  // ── Timeline ──
-  html += `<div class="section-label">Timeline</div>`;
-  if (events.length === 0) {
-    html += `<div style="font-size:14px;color:var(--text-2);padding:12px 0">No upcoming events — add expiry dates to policies to see them here.</div>`;
-  } else {
-    html += buildTimeline(events);
-  }
-
-  html += `</div>` + navHTML('dashboard');
-  document.getElementById('app').innerHTML = html;
-
-  // Re-attach calendar nav listeners (they need live DOM)
-  document.getElementById('calPrev')?.addEventListener('click', () => {
-    calViewMonth--;
-    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
-    refreshCalendar(policies);
-  });
-  document.getElementById('calNext')?.addEventListener('click', () => {
-    calViewMonth++;
-    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
-    refreshCalendar(policies);
-  });
-}
-
-function daysUntil(expiryStr) {
-  if (!expiryStr) return null;
-  return Math.ceil((new Date(expiryStr) - new Date()) / 86400000);
-}
-
-// ── Donut SVG ──
-function buildDonutSVG(segments, total) {
-  const size = 88, cx = 44, cy = 44, r = 32, stroke = 14;
-  const circ = 2 * Math.PI * r;
-  let offset = 0;
-  let arcs = '';
-  for (const s of segments) {
-    const pct = s.count / total;
-    const dash = pct * circ;
-    arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${stroke}"
-      stroke-dasharray="${dash} ${circ - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})" opacity="0.85"/>`;
-    offset += dash;
-  }
-
-  return `<div class="donut-wrap">
-    <svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="${stroke}"/>
-      ${arcs}
-      <text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="16" font-weight="800" font-family="DM Sans,sans-serif">${total}</text>
-      <text x="${cx}" y="${cy+14}" text-anchor="middle" dominant-baseline="middle" fill="#94a3b8" font-size="8" font-family="DM Sans,sans-serif">policies</text>
-    </svg>
-    <div class="donut-legend">
-      ${segments.map(s => `<div class="donut-legend-row">
-        <div class="donut-legend-dot" style="background:${s.color}"></div>
-        <span class="donut-legend-label">${s.label}</span>
-        <span class="donut-legend-count">${s.count}</span>
-      </div>`).join('')}
-    </div>
-  </div>`;
-}
-
-// ── Mini Calendar ──
-function buildMiniCalendar(policies) {
-  const y = calViewYear, m = calViewMonth;
-  const monthName = new Date(y, m, 1).toLocaleString('en-GB', { month: 'long', year: 'numeric' });
-  const today = new Date();
-
-  // Map expiry dates to day numbers this month
-  const eventDays = {};
-  policies.forEach(p => {
-    if (!p.expiry) return;
-    const d = new Date(p.expiry);
-    if (d.getFullYear() === y && d.getMonth() === m) {
-      const day = d.getDate();
-      const isExpired = d < today;
-      eventDays[day] = isExpired ? 'expired' : 'upcoming';
-    }
-    // Renewal reminder: 30 days before expiry
-    const renewal = new Date(p.expiry);
-    renewal.setDate(renewal.getDate() - 30);
-    if (renewal.getFullYear() === y && renewal.getMonth() === m) {
-      const rday = renewal.getDate();
-      if (!eventDays[rday]) eventDays[rday] = 'renew';
-    }
-  });
-
-  const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const daysInPrev = new Date(y, m, 0).getDate();
-
-  const dayLabels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-  let cells = dayLabels.map(l => `<div class="cal-day-label">${l}</div>`).join('');
-
-  // Leading days from prev month
-  for (let i = firstDay - 1; i >= 0; i--) {
-    cells += `<div class="cal-day other-month">${daysInPrev - i}</div>`;
-  }
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
-    const evt = eventDays[d];
-    cells += `<div class="cal-day ${isToday ? 'today' : ''} ${evt ? 'has-event' : ''} ${evt === 'expired' ? 'expired-event' : ''}" title="${evt ? (evt === 'expired' ? 'Expired' : evt === 'renew' ? 'Renewal reminder' : 'Policy expires') : ''}">${d}</div>`;
-  }
-
-  // Trailing days
-  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
-  for (let d = 1; d <= totalCells - firstDay - daysInMonth; d++) {
-    cells += `<div class="cal-day other-month">${d}</div>`;
-  }
-
-  return `
-    <div class="cal-month-nav">
-      <button class="cal-nav-btn" id="calPrev">‹</button>
-      <span class="cal-month-title">${monthName}</span>
-      <button class="cal-nav-btn" id="calNext">›</button>
-    </div>
-    <div class="cal-grid">${cells}</div>
-    <div style="display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--text-2)">
-      <span>🟡 Expires / 🔴 Expired</span>
-      <span style="color:var(--purple)">● Renew reminder</span>
-    </div>`;
-}
-
-function refreshCalendar(policies) {
-  const card = document.querySelector('.cal-grid')?.closest('.card-body');
-  if (!card) return;
-  card.innerHTML = buildMiniCalendar(policies);
-  document.getElementById('calPrev')?.addEventListener('click', () => {
-    calViewMonth--;
-    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
-    refreshCalendar(policies);
-  });
-  document.getElementById('calNext')?.addEventListener('click', () => {
-    calViewMonth++;
-    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
-    refreshCalendar(policies);
-  });
-}
-
-// ── Timeline events builder ──
-function buildTimelineEvents(policies, now) {
-  const events = [];
-  policies.forEach(p => {
-    const meta = getPolicyMeta(p.type);
-    if (!p.expiry) return;
-    const expDate = new Date(p.expiry);
-    const days = Math.ceil((expDate - now) / 86400000);
-
-    // Renewal reminder event (30 days before)
-    const renewDate = new Date(expDate);
-    renewDate.setDate(renewDate.getDate() - 30);
-
-    if (days < 0) {
-      events.push({ date: expDate, type: 'expired', policy: p, meta, days, label: 'Expired', color: '#ef4444', cls: 'ev-expired' });
-    } else {
-      if (days <= 30) {
-        events.push({ date: expDate, type: 'urgent', policy: p, meta, days, label: `Expires in ${days} day${days===1?'':'s'}`, color: '#f59e0b', cls: 'ev-urgent' });
-      } else {
-        events.push({ date: expDate, type: 'expiry', policy: p, meta, days, label: 'Policy expires', color: '#3b82f6', cls: '' });
-      }
-      // Only show renew reminder if it's in the future
-      if (renewDate > now && days > 30) {
-        events.push({ date: renewDate, type: 'renew', policy: p, meta, days: days - 30, label: '💡 Good time to start renewing', color: '#8b5cf6', cls: 'ev-renew' });
-      }
-    }
-  });
-
-  // Sort: expired first (most recent), then upcoming by date
-  events.sort((a, b) => {
-    if (a.type === 'expired' && b.type !== 'expired') return -1;
-    if (b.type === 'expired' && a.type !== 'expired') return 1;
-    return a.date - b.date;
-  });
-
-  return events;
-}
-
-function buildTimeline(events) {
-  let html = '<div class="timeline">';
-  let lastMonthKey = null;
-
-  events.forEach(ev => {
-    const monthKey = `${ev.date.getFullYear()}-${ev.date.getMonth()}`;
-    const isNow = new Date().getMonth() === ev.date.getMonth() && new Date().getFullYear() === ev.date.getFullYear();
-
-    if (monthKey !== lastMonthKey) {
-      lastMonthKey = monthKey;
-      const label = ev.type === 'expired' && ev.date < new Date()
-        ? ev.date.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
-        : ev.date.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
-      html += `<div class="timeline-month ${isNow ? 'is-today' : ''}">${label}</div>`;
-    }
-
-    const dateStr = ev.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-
-    html += `<div class="timeline-event ${ev.cls}" onclick="renderPolicyDetail(${ev.policy.id})">
-      <div class="timeline-event-dot" style="background:${ev.color}"></div>
-      <div class="timeline-event-body">
-        <div class="timeline-event-title">${ev.meta.icon} ${esc(ev.policy.insurer || ev.meta.label)}</div>
-        <div class="timeline-event-sub">${ev.label}${ev.type === 'renew' ? ' — policy renews 30 days later' : ''}</div>
-      </div>
-      <div class="timeline-event-date">${dateStr}</div>
-    </div>`;
-  });
-
-  html += '</div>';
-  return html;
 }
 
 /* ═══════════════════════════════════════
@@ -1571,37 +1089,20 @@ async function exportQR() {
 function renderScan() {
   activeTab = 'scan';
   let html = headerHTML('Scan', false) + `<div class="container page">
-
     <div class="section-label">Import QR Code</div>
     <div class="card">
       <div class="card-body">
-        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Point your camera at a Coverly QR code to import all policies from another device.</p>
+        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Point your camera at a Coverly QR code to import policies.</p>
         <button class="btn btn-blue" onclick="startQRScan()">📷 Start QR Scanner</button>
       </div>
     </div>
-
-    <div class="section-label">Scan Document to Add Policy</div>
+    <div class="section-label">Scan Insurance Document</div>
     <div class="card">
       <div class="card-body">
-        <p style="font-size:14px;color:var(--text-2);margin-bottom:14px">Coverly will scan the document and pre-fill the policy form. Supports photos and PDFs.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button class="btn btn-ghost" onclick="startOCRCamera()" style="margin:0;font-size:13px">📸 Take Photo</button>
-          <button class="btn btn-ghost" onclick="startOCRFile()" style="margin:0;font-size:13px">🖼️ Choose Image</button>
-        </div>
-        <button class="btn btn-ghost" onclick="startOCRPDF()" style="margin-top:8px;font-size:13px">📄 Upload PDF</button>
+        <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Take a photo of your insurance document to automatically extract policy details using OCR.</p>
+        <button class="btn btn-ghost" onclick="startOCR()">📄 Scan Document</button>
       </div>
     </div>
-
-    <div class="card" style="background:var(--blue-dim);border-color:rgba(59,130,246,0.2)">
-      <div class="card-body" style="font-size:13px;color:var(--text-2);line-height:1.6">
-        <b style="color:var(--text)">💡 Tips for best results</b><br>
-        • Lay document flat in good lighting<br>
-        • Ensure text is sharp and not blurry<br>
-        • Include the full document in frame<br>
-        • Avoid shadows across the text
-      </div>
-    </div>
-
     <div id="scanArea"></div>
   </div>` + navHTML('scan');
   document.getElementById('app').innerHTML = html;
@@ -1669,381 +1170,69 @@ function stopCamera() {
 }
 
 /* ═══════════════════════════════════════
-   OCR — IMAGE + PDF
+   OCR
 ═══════════════════════════════════════ */
-function startOCRCamera() {
-  document.getElementById('fileInputCamera').click();
-}
-function startOCRFile() {
+function startOCR() {
   document.getElementById('fileInput').click();
 }
-function startOCRPDF() {
-  const input = document.getElementById('fileInput');
-  input.accept = 'application/pdf';
-  input.click();
-  // reset accept after pick
-  setTimeout(() => { input.accept = 'image/*,application/pdf'; }, 2000);
-}
-// legacy hook from Add screen button
-function startOCR() { startOCRFile(); }
 
-// ── Image preprocessing: greyscale + contrast boost ──
-function preprocessImageForOCR(file) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      // Scale down large images to max 2000px wide for speed
-      const MAX = 2000;
-      let w = img.naturalWidth, h = img.naturalHeight;
-      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-
-      // Convert to greyscale and boost contrast
-      const id = ctx.getImageData(0, 0, w, h);
-      const d = id.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const grey = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-        // contrast stretch: make light→lighter, dark→darker
-        const c = Math.min(255, Math.max(0, (grey - 128) * 1.4 + 128));
-        d[i] = d[i+1] = d[i+2] = c;
-      }
-      ctx.putImageData(id, 0, 0);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(resolve, 'image/png');
-    };
-    img.src = url;
-  });
-}
-
-// ── Extract text directly from PDF text layer (no OCR needed for digital PDFs) ──
-async function extractTextFromPDF(file) {
-  const pdfjsLib = window['pdfjs-dist/build/pdf'];
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  // Extract text from ALL pages and join — insurance docs often span 2-3 pages
-  let fullText = '';
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    // Join items preserving line breaks by grouping by Y position
-    const lines = {};
-    content.items.forEach(item => {
-      const y = Math.round(item.transform[5]); // Y coordinate
-      if (!lines[y]) lines[y] = [];
-      lines[y].push(item.str);
-    });
-    // Sort lines top→bottom (higher Y = higher on page in PDF coords)
-    const sortedYs = Object.keys(lines).map(Number).sort((a, b) => b - a);
-    fullText += sortedYs.map(y => lines[y].join(' ')).join('\n') + '\n';
-  }
-  return fullText;
-}
-
-// ── Render PDF to image (fallback for scanned/image-based PDFs) ──
-async function pdfToImageBlob(file) {
-  const pdfjsLib = window['pdfjs-dist/build/pdf'];
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale: 3.0 }); // 3x for better OCR accuracy
-
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext('2d');
-  await page.render({ canvasContext: ctx, viewport }).promise;
-
-  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-}
-
-// ── Master extraction — works on both PDF text layer output and OCR text ──
-function extractPolicyData(rawText) {
-  // Preserve newlines for line-by-line patterns, but also have a flat version
-  const text = rawText.replace(/\r/g, '\n').replace(/[ \t]+/g, ' ').trim();
-  const flat = text.replace(/\n+/g, ' ');
-  const lower = flat.toLowerCase();
-
-  let number = '', phone = '', insurer = '', expiry = '', type = 'other';
-  const notes = [];
-
-  // ══ POLICY NUMBER ══
-  // Strategy: try labelled patterns first (most reliable), then shape-based fallbacks
-  const numPatterns = [
-    // "Policy Number  WN834106459" — label on one line, value follows
-    /policy\s*(?:no\.?|number|#|ref\.?|id)?[\s:\-]*([A-Z]{0,4}\d{6,12}[A-Z]?)\b/i,
-    // "Policy Number: POL-123456" with separator chars
-    /policy\s*(?:no\.?|number|#|ref\.?)[:\s\-]+([A-Z0-9][A-Z0-9\-\/]{4,18})/i,
-    // "Ref/Certificate/Schedule No: ..."
-    /(?:ref(?:erence)?|cert(?:ificate)?|schedule|doc(?:ument)?)\s*(?:no\.?|number|#)?[:\s\-]+([A-Z0-9][A-Z0-9\-\/]{4,18})/i,
-    // "POL-123456" or "WN834106459" standalone (2 letters + 6-10 digits, or pure 8-12 digits)
-    /\b([A-Z]{2,4}\d{6,10})\b/,
-    /\b(\d{8,12})\b/,
-  ];
-  for (const r of numPatterns) {
-    const m = flat.match(r);
-    if (m) {
-      const candidate = m[1].replace(/\s+/g, '').trim();
-      // Reject if it looks like a phone number (starts with 0 or +)
-      if (!/^[\+0]/.test(candidate)) {
-        number = candidate;
-        break;
-      }
-    }
-  }
-
-  // ══ PHONE ══
-  // Priority order: emergency/claims lines first (most useful), then any phone
-  const phonePatterns = [
-    // "+44 (0) 1403 788 718" style — the (0) in the middle was breaking the old regex
-    /(?:emergency|medical\s+emergency|assistance)[^\n]{0,60}\n?[^\n]{0,30}(?:tel|call|phone)?[:\s]*(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    /(?:claim|claims)[^\n]{0,60}\n?[^\n]{0,30}(?:tel|call|phone)?[:\s]*(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    /(?:helpline|contact|call\s+us|customer\s+service|support)[^\n]{0,30}[:\s]*(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    // Tel: label inline
-    /\btel(?:ephone)?[:\s]+(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    // +44 (0) XXXX format — specifically handles the (0) style
-    /(\+44\s*\(0\)\s*[\d][\d\s\-]{6,14})/,
-    // +44 without (0)
-    /(\+44\s?[\d][\d\s\-]{8,13})/,
-    // UK freephone / local rate
-    /\b(0(?:800|808|845|870|118|1\d{2,3}|2\d|3\d{2})[\s\d\-\(\)]{6,12})\b/,
-  ];
-  for (const r of phonePatterns) {
-    const m = text.match(r); // use text (with newlines) for multi-line patterns
-    if (m) {
-      let p = m[1].replace(/\s+/g, ' ').trim();
-      // Clean up: remove anything after a non-phone char
-      p = p.replace(/[^0-9\+\(\)\-\s].*$/, '').trim();
-      // Validate: must have at least 8 digits
-      if ((p.match(/\d/g) || []).length >= 8) {
-        phone = p;
-        break;
-      }
-    }
-  }
-
-  // ══ INSURER ══
-  // For insurance docs: the selling/admin company is the insurer from user perspective
-  const insurerPatterns = [
-    // "sold and administered by COMPANY" — high quality signal
-    /(?:sold\s+and\s+administered|administered)\s+by\s+([A-Z][A-Za-z\s&\.\-']{2,45}?)(?:\s+who|\s+Ltd|\s+Limited|\s+PLC|\s+plc|,|\n)/i,
-    // "provided by / issued by COMPANY"
-    /(?:provided|issued|underwritten)\s+by\s+([A-Z][A-Za-z\s&\.\-']{2,45}?)(?:\s+Ltd|\s+Limited|\s+PLC|,|\.|Insurance\s+Services|\n)/i,
-    // Line that just says "COMPANY Insurance" or "COMPANY Cover" at start of line
-    /^([A-Z][A-Za-z\s&]{3,35}(?:\s+Insurance|\s+Cover|\s+Assurance|\s+Mutual|\s+Direct|\s+Life))\s*$/m,
-    // "Insurer: COMPANY"
-    /(?:insurer|insurance\s+company)[:\s]+([A-Za-z][A-Za-z\s&\.\-']{2,40}?)(?:\n|Ltd|PLC|plc|Limited)/i,
-  ];
-  for (const r of insurerPatterns) {
-    const m = text.match(r);
-    if (m) {
-      const candidate = m[1].trim().replace(/\s+/g, ' ');
-      // Reject generic phrases
-      if (!/^(the|a|an|your|this|our)\b/i.test(candidate) && candidate.length > 3) {
-        insurer = candidate;
-        break;
-      }
-    }
-  }
-
-  // ══ EXPIRY DATE ══
-  // For travel: use Travel End Date. For others: expiry/renewal/valid until.
-  const datePatterns = [
-    // Travel End Date — specific to travel insurance docs
-    /travel\s+end\s+date[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-    /(?:cover(?:age)?\s+end(?:s)?|policy\s+end(?:s)?)[:\s\-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-    /(?:expir(?:y|es?|ation|ed?)|valid\s+(?:until|to)|renewal\s+(?:date)?|end\s+date)[:\s\-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-    /(?:expir(?:y|es?)|renewal)[:\s\-]*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i,
-  ];
-  for (const r of datePatterns) {
-    const m = flat.match(r);
-    if (m) {
-      expiry = parseDateToISO(m[1]);
-      if (expiry) break;
-    }
-  }
-
-  // ══ POLICY TYPE ══
-  // Check in priority order — more specific terms first
-  if (/\b(motor|vehicle|car\s+insur|comprehensive|third\s+party|road\s+risk)\b/.test(lower)) type = 'car';
-  else if (/\b(travel|trip|holiday\s+insurance|abroad|single\s+trip|annual\s+trip|bronze|silver|gold)\b/.test(lower)) type = 'travel';
-  else if (/\b(home|household|buildings|contents|landlord|property)\b/.test(lower)) type = 'home';
-  else if (/\b(private\s+medical|health\s+insur|dental|vision|bupa|axa\s+health)\b/.test(lower)) type = 'health';
-  else if (/\b(life\s+insur|life\s+cover|death\s+benefit|whole\s+life|term\s+life)\b/.test(lower)) type = 'life';
-  else if (/\b(pet|dog|cat|animal|veterinary)\b/.test(lower)) type = 'pet';
-  else if (/\b(public\s+liability|employer|commercial|business\s+insur|trade)\b/.test(lower)) type = 'business';
-
-  // ══ EXTRA NOTES — capture useful fields ══
-  // Premium
-  const premMatch = flat.match(/premium[:\s]+£?([\d,\.]+)/i);
-  if (premMatch) notes.push(`Premium: £${premMatch[1]}`);
-  // Destination (travel)
-  const destMatch = flat.match(/destination[:\s]+([^\n]{3,60})/i);
-  if (destMatch) notes.push(`Destination: ${destMatch[1].trim()}`);
-  // Lead traveller
-  const travMatch = flat.match(/lead\s+traveller[:\s]+([^\n]{3,50})/i);
-  if (travMatch) notes.push(`Lead traveller: ${travMatch[1].trim()}`);
-
-  return { number, phone, insurer, expiry, type, notes: notes.join('\n') };
-}
-
-function parseDateToISO(str) {
-  if (!str) return '';
-  let m = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
-  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
-  if (m) {
-    const y = m[3].length === 2 ? '20' + m[3] : m[3];
-    return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  }
-  return '';
-}
-
-// ── Show OCR result in a reviewable sheet ──
-function showOCRResultSheet(extracted, rawText) {
-  const { number, phone, insurer, expiry, type, notes } = extracted;
-  const hasAny = number || phone || insurer || expiry;
-  const typeOptions = POLICY_TYPES.map(t =>
-    `<option value="${t.key}" ${type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`
-  ).join('');
+document.getElementById('fileInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
 
   showSheet(`
-    <div class="sheet-title">${hasAny ? '✅ Document Scanned' : '⚠️ Scan Complete'}</div>
-    <div class="sheet-sub">${hasAny
-      ? 'Review the extracted fields below and tap "Use These Details" to pre-fill the form.'
-      : 'We couldn\'t reliably extract details. You can still fill the form manually, or try a clearer image.'
-    }</div>
-
-    ${hasAny ? `
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-body" style="font-size:14px;display:flex;flex-direction:column;gap:10px">
-        <div class="field" style="margin:0"><label>Policy Type (detected)</label><select id="ocr_type">${typeOptions}</select></div>
-        ${insurer ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Insurer</span><div style="font-weight:600;margin-top:2px">${esc(insurer)}</div></div>` : ''}
-        ${number ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Policy Number</span><div style="font-family:'DM Mono',monospace;margin-top:2px">${esc(number)}</div></div>` : ''}
-        ${phone ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Phone</span><div style="margin-top:2px">${esc(phone)}</div></div>` : ''}
-        ${expiry ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Expiry / End Date</span><div style="margin-top:2px">${formatDate(expiry)}</div></div>` : ''}
-        ${notes ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Auto-filled Notes</span><div style="margin-top:2px;font-size:13px;color:var(--text-2);line-height:1.5">${esc(notes)}</div></div>` : ''}
-      </div>
-    </div>
-    <button class="btn btn-primary" onclick="applyOCRResult(${JSON.stringify(extracted).replace(/"/g,'&quot;')})">✅ Use These Details</button>
-    ` : ''}
-
-    <button class="btn btn-ghost" onclick="closeSheet();renderAdd();" style="margin-top:${hasAny?'4':'0'}px">✏️ Fill In Manually</button>
-
-    <details style="margin-top:16px">
-      <summary style="font-size:12px;color:var(--text-3);cursor:pointer">Show extracted text</summary>
-      <div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text-2);background:var(--card);border-radius:8px;padding:10px;margin-top:8px;max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">${esc(rawText.slice(0,2000))}</div>
-    </details>
-  `);
-}
-
-function applyOCRResult(extracted) {
-  const typeEl = document.getElementById('ocr_type');
-  if (typeEl) extracted.type = typeEl.value;
-  closeSheet();
-  renderAdd(extracted);
-}
-
-// ── Shared OCR pipeline ──
-async function runOCR(blob, label) {
-  showSheet(`
-    <div class="sheet-title">📄 Scanning ${label}</div>
-    <div class="sheet-sub">Reading text from your document. This can take 10–30 seconds depending on the image…</div>
-    <div style="text-align:center;padding:24px 0">
-      <div style="font-size:36px;animation:spin 1.5s linear infinite;display:inline-block">⏳</div>
-    </div>
-    <style>@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}</style>
+    <div class="sheet-title">📄 Scanning Document</div>
+    <div class="sheet-sub">Extracting policy details from your image. This may take a moment...</div>
+    <div style="text-align:center;padding:20px;font-size:32px">⏳</div>
   `);
 
   try {
-    const worker = await Tesseract.createWorker('eng', 1, {
-      logger: () => {},
-      errorHandler: () => {},
-    });
-    await worker.setParameters({
-      tessedit_pageseg_mode: '1',   // Automatic page segmentation
-      preserve_interword_spaces: '1',
-    });
-    const { data: { text } } = await worker.recognize(blob);
-    await worker.terminate();
+    const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: () => {} });
 
-    const extracted = extractPolicyData(text);
-    showOCRResultSheet(extracted, text);
+    // Smart extraction
+    const policyPatterns = [
+      /policy\s*(?:no|number|#)?[:\s]+([A-Z0-9\-\/]{5,20})/i,
+      /pol[:\s]+([A-Z0-9\-]{5,20})/i,
+    ];
+    const phonePatterns = [
+      /(?:tel|phone|call|contact)[:\s]+(\+?[\d\s\-\(\)]{8,16})/i,
+      /(\+44[\s\d\-]{9,14})/,
+      /(\+?0[\d\s\-]{9,13})/,
+    ];
+    const insurerPattern = /(?:insured\s+by|insurer|company)[:\s]+([A-Za-z\s&]+?)(?:\n|ltd|plc|insurance)/i;
+    const expiryPattern = /(?:expir(?:y|es|ation)|valid\s+until|renewal)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i;
+
+    let number = '', phone = '', insurer = '', expiry = '';
+
+    for (const r of policyPatterns) { const m = text.match(r); if (m) { number = m[1]; break; } }
+    if (!number) { const m = text.match(/\b([A-Z]{2,4}[\-\s]?\d{6,12})\b/); if (m) number = m[1]; }
+
+    for (const r of phonePatterns) { const m = text.match(r); if (m) { phone = m[1].replace(/\s+/g, ' ').trim(); break; } }
+
+    const im = text.match(insurerPattern);
+    if (im) insurer = im[1].trim();
+
+    const em = text.match(expiryPattern);
+    if (em) {
+      const parts = em[1].split(/[\/\-]/);
+      if (parts.length === 3) {
+        const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+        expiry = `${y}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+      }
+    }
+
+    closeSheet();
+    pendingOCRData = { number, phone, insurer, expiry };
+    renderAdd(pendingOCRData);
+    if (number || phone) toast('✅ Details extracted — please review');
+    else toast('⚠️ Could not extract details — fill in manually');
+
   } catch (err) {
     closeSheet();
-    toast('⚠️ Scan failed — try a clearer image');
+    toast('⚠️ Scan failed. Try a clearer image.');
     renderAdd();
   }
-}
-
-// ── File input handlers ──
-async function handleOCRFile(file) {
-  if (!file) return;
-  document.getElementById('fileInput').value = '';
-  document.getElementById('fileInputCamera').value = '';
-
-  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-
-  if (isPDF) {
-    showSheet(`
-      <div class="sheet-title">📄 Reading PDF…</div>
-      <div class="sheet-sub">Extracting text from your document…</div>
-      <div style="text-align:center;padding:24px 0;font-size:32px">📖</div>
-    `);
-    try {
-      // First: try reading the text layer directly (works for all digital/typed PDFs)
-      const textLayerText = await extractTextFromPDF(file);
-      const hasUsefulText = textLayerText.replace(/\s+/g, '').length > 50;
-
-      if (hasUsefulText) {
-        // Good — digital PDF, text layer extracted cleanly
-        const extracted = extractPolicyData(textLayerText);
-        showOCRResultSheet(extracted, textLayerText);
-      } else {
-        // Scanned/image PDF — fall back to OCR on rendered image
-        updateSheetContent(`
-          <div class="sheet-title">📄 Scanning PDF…</div>
-          <div class="sheet-sub">This looks like a scanned document. Running OCR — this may take 15–30 seconds…</div>
-          <div style="text-align:center;padding:24px 0">
-            <div style="font-size:36px;animation:spin 1.5s linear infinite;display:inline-block">⏳</div>
-          </div>
-          <style>@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}</style>
-        `);
-        const blob = await pdfToImageBlob(file);
-        await runOCR(blob, 'PDF');
-      }
-    } catch(e) {
-      closeSheet();
-      toast('⚠️ Could not read PDF');
-      renderAdd();
-    }
-  } else {
-    // Image file — preprocess then OCR
-    const processed = await preprocessImageForOCR(file);
-    await runOCR(processed, 'image');
-  }
-}
-
-function updateSheetContent(html) {
-  const sheet = document.getElementById('sheet');
-  if (sheet) sheet.innerHTML = `<div class="sheet-handle"></div>${html}`;
-}
-
-document.getElementById('fileInput').addEventListener('change', e => {
-  handleOCRFile(e.target.files[0]);
-});
-document.getElementById('fileInputCamera').addEventListener('change', e => {
-  handleOCRFile(e.target.files[0]);
 });
 
 /* ═══════════════════════════════════════
@@ -2167,7 +1356,7 @@ async function renderSettings() {
     </div>
   </div>`;
 
-  html += `<div class="section-label">Backup & Restore</div>
+  html += `<div class="section-label">Data</div>
   <div class="card">
     <div class="card-body">
       <div class="settings-row">
@@ -2176,26 +1365,7 @@ async function renderSettings() {
           <div class="settings-desc">${policies.length} polic${policies.length === 1 ? 'y' : 'ies'} on this device</div>
         </div>
       </div>
-      <div class="settings-row">
-        <div>
-          <div class="settings-label">🕐 Last backup</div>
-          <div class="settings-desc">${(() => {
-            const t = parseInt(localStorage.getItem('coverly_last_backup') || '0', 10);
-            if (!t) return '<span style="color:var(--amber)">Never backed up</span>';
-            const days = Math.floor((Date.now() - t) / 86400000);
-            if (days === 0) return 'Today';
-            if (days === 1) return 'Yesterday';
-            return `${days} days ago`;
-          })()}</div>
-        </div>
-      </div>
-      <button class="btn btn-blue" onclick="startBackup()" style="margin-top:10px">⬇️ Back Up Now</button>
-      <button class="btn btn-ghost" onclick="startRestore()" style="margin-top:6px">📂 Restore from Backup</button>
-      <button class="btn btn-ghost" onclick="exportQR()" style="margin-top:6px;font-size:13px">⬆️ Export via QR</button>
-      <button class="btn btn-ghost" onclick="confirmLoadDemo()" style="margin-top:6px;font-size:13px">📋 Load Example Policies</button>
-      <div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.6">
-        🔐 Backups are encrypted with your password on-device. Coverly never sees your data or password.
-      </div>
+      <button class="btn btn-ghost" onclick="exportQR()" style="margin-top:8px">⬆️ Export via QR</button>
     </div>
   </div>`;
 
@@ -2339,72 +1509,8 @@ function nextOnboard() {
 }
 
 /* ═══════════════════════════════════════
-   DEMO DATA
+   PWA INSTALL
 ═══════════════════════════════════════ */
-const DEMO_POLICIES = [
-  {
-    type: 'car',
-    insurer: 'Direct Line',
-    number: 'DL-7742839',
-    phone: '0800 197 6160',
-    expiry: '2026-03-14',
-    emergencyContact: 'Sarah (wife) — 07700 900123',
-    notes: '£250 excess. Comprehensive cover. Includes European breakdown. Recovery number: 0800 587 1147',
-    createdAt: Date.now() - 86400000 * 30,
-  },
-  {
-    type: 'home',
-    insurer: 'Aviva Home Insurance',
-    number: 'AV-3312-HJKL',
-    phone: '0345 030 7093',
-    expiry: '2026-08-22',
-    emergencyContact: '',
-    notes: 'Buildings + Contents. Rebuilding value £320,000. Contents £45,000. Excess £150. 24hr emergency line for burst pipes/break-ins.',
-    createdAt: Date.now() - 86400000 * 60,
-  },
-  {
-    type: 'health',
-    insurer: 'Bupa Health',
-    number: 'BUP-4490221-A',
-    phone: '0345 609 0111',
-    expiry: '2025-12-31',
-    emergencyContact: 'Dr. Patel (GP) — 0207 111 2233',
-    notes: 'Family plan. Includes dental and optical. Pre-authorisation required for specialist referrals. Mental health cover included.',
-    createdAt: Date.now() - 86400000 * 90,
-  },
-  {
-    type: 'travel',
-    insurer: 'AXA Travel',
-    number: 'TRV-AXA-88213',
-    phone: '+44 1444 442 552',
-    expiry: '2026-06-30',
-    emergencyContact: '',
-    notes: 'Annual multi-trip policy. Worldwide including USA/Canada. 31-day max per trip. Cancellation cover £5,000. Medical £10m.',
-    createdAt: Date.now() - 86400000 * 10,
-  },
-];
-
-async function seedDemoData() {
-  for (const p of DEMO_POLICIES) {
-    await addPolicy(p);
-  }
-}
-
-async function confirmLoadDemo() {
-  showSheet(`
-    <div class="sheet-title">📋 Load Example Policies?</div>
-    <div class="sheet-sub">This will add 4 realistic example policies so you can explore all the features of Coverly. You can delete them at any time.</div>
-    <button class="btn btn-primary" onclick="doLoadDemo()">✅ Yes, load examples</button>
-    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Not now</button>
-  `);
-}
-
-async function doLoadDemo() {
-  closeSheet();
-  await seedDemoData();
-  toast('✅ 4 example policies loaded!');
-  renderHome();
-}
 let deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -2440,237 +1546,8 @@ function formatDate(d) {
 }
 
 /* ═══════════════════════════════════════
-   ENCRYPTED BACKUP & RESTORE
+   BOOT
 ═══════════════════════════════════════ */
-
-// ── Crypto helpers (Web Crypto API — all on-device, no network) ──
-async function deriveKey(password, salt) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
-
-async function encryptData(plaintext, password) {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iv   = crypto.getRandomValues(new Uint8Array(12));
-  const key  = await deriveKey(password, salt);
-  const enc  = new TextEncoder();
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv }, key, enc.encode(plaintext)
-  );
-  // Pack: magic(8) + version(1) + salt(16) + iv(12) + ciphertext
-  const magic = new TextEncoder().encode('COVERLY1');
-  const buf = new Uint8Array(8 + 1 + 16 + 12 + ciphertext.byteLength);
-  buf.set(magic, 0);
-  buf.set([1], 8);          // version byte
-  buf.set(salt, 9);
-  buf.set(iv, 25);
-  buf.set(new Uint8Array(ciphertext), 37);
-  return buf;
-}
-
-async function decryptData(buf, password) {
-  const magic = new TextDecoder().decode(buf.slice(0, 8));
-  if (magic !== 'COVERLY1') throw new Error('Not a valid Coverly backup file');
-  const salt       = buf.slice(9, 25);
-  const iv         = buf.slice(25, 37);
-  const ciphertext = buf.slice(37);
-  const key        = await deriveKey(password, salt);
-  const plainBuf   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
-  return new TextDecoder().decode(plainBuf);
-}
-
-// ── Export backup ──
-async function startBackup() {
-  showSheet(`
-    <div class="sheet-title">🔐 Create Encrypted Backup</div>
-    <div class="sheet-sub">Choose a password to encrypt your backup file. You'll need this password to restore your data — there's no way to recover it if forgotten.</div>
-    <div class="field"><label>Backup Password</label><input id="bp1" type="password" placeholder="Choose a strong password" autocomplete="new-password"></div>
-    <div class="field"><label>Confirm Password</label><input id="bp2" type="password" placeholder="Enter again to confirm" autocomplete="new-password"></div>
-    <div id="backupErr" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
-    <button class="btn btn-primary" onclick="doBackup()">⬇️ Download Backup File</button>
-    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
-    <div style="font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6">
-      💡 Save the downloaded <b>.coverly</b> file to your Google Drive, iCloud, email, or USB — wherever you keep important files. Coverly never sees it.
-    </div>
-  `);
-}
-
-async function doBackup() {
-  const p1 = document.getElementById('bp1')?.value;
-  const p2 = document.getElementById('bp2')?.value;
-  const errEl = document.getElementById('backupErr');
-
-  if (!p1 || p1.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
-  if (p1 !== p2) { errEl.textContent = 'Passwords do not match'; return; }
-
-  errEl.textContent = '';
-  const btn = document.querySelector('#sheet .btn-primary');
-  if (btn) { btn.textContent = '⏳ Encrypting…'; btn.disabled = true; }
-
-  try {
-    const policies = await getPolicies();
-    const payload = JSON.stringify({ coverly: true, v: 3, exportedAt: Date.now(), policies });
-    const encrypted = await encryptData(payload, p1);
-
-    // Download
-    const blob = new Blob([encrypted], { type: 'application/octet-stream' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    const date = new Date().toISOString().slice(0, 10);
-    a.href     = url;
-    a.download = `coverly-backup-${date}.coverly`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    // Record last backup time
-    localStorage.setItem('coverly_last_backup', Date.now().toString());
-    closeSheet();
-    toast('✅ Backup downloaded!', 3000);
-  } catch (err) {
-    if (btn) { btn.textContent = '⬇️ Download Backup File'; btn.disabled = false; }
-    errEl.textContent = 'Encryption failed — please try again';
-  }
-}
-
-// ── Restore backup ──
-function startRestore() {
-  showSheet(`
-    <div class="sheet-title">📂 Restore from Backup</div>
-    <div class="sheet-sub">Select your <b>.coverly</b> backup file and enter the password you used when you created it.</div>
-    <div class="field"><label>Backup File</label>
-      <button class="btn btn-ghost" onclick="document.getElementById('restoreInput').click()" style="text-align:left">
-        📁 Choose .coverly file
-      </button>
-      <div id="restoreFileName" style="font-size:12px;color:var(--text-2);margin-top:6px"></div>
-    </div>
-    <div class="field"><label>Backup Password</label><input id="rp" type="password" placeholder="Enter your backup password" autocomplete="current-password"></div>
-    <div id="restoreErr" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
-    <button class="btn btn-primary" id="restoreBtn" onclick="doRestore()">🔓 Restore Policies</button>
-    <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
-    <div style="font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6">
-      ⚠️ Restoring will <b>add</b> policies from the backup to your current vault. It won't delete existing policies.
-    </div>
-  `);
-}
-
-let restoreFileBuffer = null;
-
-document.getElementById('restoreInput').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  const nameEl = document.getElementById('restoreFileName');
-  if (nameEl) nameEl.textContent = `📎 ${file.name}`;
-  restoreFileBuffer = await file.arrayBuffer();
-});
-
-async function doRestore() {
-  const password = document.getElementById('rp')?.value;
-  const errEl    = document.getElementById('restoreErr');
-
-  if (!restoreFileBuffer) { errEl.textContent = 'Please choose a backup file first'; return; }
-  if (!password)          { errEl.textContent = 'Please enter your backup password'; return; }
-
-  const btn = document.getElementById('restoreBtn');
-  if (btn) { btn.textContent = '⏳ Decrypting…'; btn.disabled = true; }
-  errEl.textContent = '';
-
-  try {
-    const buf  = new Uint8Array(restoreFileBuffer);
-    const json = await decryptData(buf, password);
-    const data = JSON.parse(json);
-    const list = data.policies || (Array.isArray(data) ? data : null);
-    if (!list) throw new Error('Invalid backup structure');
-
-    for (const p of list) {
-      const { id, ...rest } = p;
-      await addPolicy(rest);
-    }
-
-    restoreFileBuffer = null;
-    localStorage.setItem('coverly_last_backup', Date.now().toString());
-    closeSheet();
-    toast(`✅ Restored ${list.length} polic${list.length === 1 ? 'y' : 'ies'}`, 3000);
-    activeTab = 'home';
-    renderHome();
-  } catch (err) {
-    if (btn) { btn.textContent = '🔓 Restore Policies'; btn.disabled = false; }
-    if (err.message?.includes('valid Coverly')) {
-      errEl.textContent = 'This does not look like a Coverly backup file';
-    } else {
-      errEl.textContent = 'Wrong password or corrupted file';
-    }
-  }
-}
-
-// ── Backup prompt logic ──
-// Shows a gentle non-blocking banner when:
-//  • User is online
-//  • There are policies to back up
-//  • It's been 14+ days since last backup (or never backed up)
-//  • The banner hasn't been dismissed in this session
-let backupBannerShown = false;
-
-async function maybeShowBackupPrompt() {
-  if (backupBannerShown) return;
-  if (!navigator.onLine) return;
-
-  const policies = await getPolicies();
-  if (policies.length === 0) return;
-
-  const lastBackup = parseInt(localStorage.getItem('coverly_last_backup') || '0', 10);
-  const daysSince  = lastBackup ? (Date.now() - lastBackup) / 86400000 : Infinity;
-
-  if (daysSince < 14) return;
-
-  backupBannerShown = true;
-  showBackupBanner(lastBackup);
-}
-
-function showBackupBanner(lastBackup) {
-  // Remove any existing banner
-  document.getElementById('backupBanner')?.remove();
-
-  const sub = lastBackup
-    ? `Last backup: ${new Date(lastBackup).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}`
-    : 'You haven\'t backed up yet';
-
-  const banner = document.createElement('div');
-  banner.className = 'backup-banner';
-  banner.id = 'backupBanner';
-  banner.innerHTML = `
-    <div class="backup-banner-icon">☁️</div>
-    <div class="backup-banner-text">
-      <div class="backup-banner-title">Back up your vault</div>
-      <div class="backup-banner-sub">${sub}</div>
-    </div>
-    <div class="backup-banner-actions">
-      <button class="backup-banner-btn primary" onclick="dismissBackupBanner();startBackup()">Back up</button>
-      <button class="backup-banner-btn ghost" onclick="dismissBackupBanner()">Later</button>
-    </div>
-  `;
-  document.body.appendChild(banner);
-}
-
-function dismissBackupBanner() {
-  const b = document.getElementById('backupBanner');
-  if (b) {
-    b.style.animation = 'none';
-    b.style.opacity = '0';
-    b.style.transform = 'translateY(16px)';
-    b.style.transition = 'opacity 0.2s, transform 0.2s';
-    setTimeout(() => b.remove(), 200);
-  }
-}
 async function boot() {
   await initDB();
   getLocation();
@@ -2686,18 +1563,7 @@ async function boot() {
     return;
   }
 
-  // Seed demo data once if vault is empty and never seeded
-  const policies = await getPolicies();
-  if (policies.length === 0 && !localStorage.getItem('coverly_demo_asked')) {
-    localStorage.setItem('coverly_demo_asked', '1');
-    renderHome();
-    setTimeout(confirmLoadDemo, 600);
-    return;
-  }
-
-  await renderHome();
-  // Show backup banner after a short delay so home renders first
-  setTimeout(maybeShowBackupPrompt, 1200);
+  renderHome();
 }
 
 if ('serviceWorker' in navigator) {
