@@ -1841,133 +1841,199 @@ async function pdfToImageBlob(file) {
 
 // ── Master extraction — works on both PDF text layer output and OCR text ──
 function extractPolicyData(rawText) {
-  // Preserve newlines for line-by-line patterns, but also have a flat version
   const text = rawText.replace(/\r/g, '\n').replace(/[ \t]+/g, ' ').trim();
-  const flat = text.replace(/\n+/g, ' ');
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const flat  = text.replace(/\n+/g, ' ');
   const lower = flat.toLowerCase();
 
   let number = '', phone = '', insurer = '', expiry = '', type = 'other';
   const notes = [];
 
+  // ══ HELPER: Next-line label→value ══
+  // Many insurance PDFs put the label on one line and the value on the next.
+  // e.g.  "CERTIFICATE NUMBER\nCFYAM24-8368292"
+  function nextLineValue(labelPattern) {
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (labelPattern.test(lines[i])) {
+        // Try the immediately following line first
+        const v1 = lines[i + 1];
+        // A value line should not itself be a pure all-caps label
+        if (v1 && !/^[A-Z][A-Z\s\/\(\)]{3,}$/.test(v1)) return v1.trim();
+        // Otherwise try the line after that
+        if (lines[i + 2] && !/^[A-Z][A-Z\s\/\(\)]{3,}$/.test(lines[i + 2])) return lines[i + 2].trim();
+      }
+    }
+    return '';
+  }
+
   // ══ POLICY NUMBER ══
-  // Strategy: try labelled patterns first (most reliable), then shape-based fallbacks
-  const numPatterns = [
-    // "Policy Number  WN834106459" — label on one line, value follows
-    /policy\s*(?:no\.?|number|#|ref\.?|id)?[\s:\-]*([A-Z]{0,4}\d{6,12}[A-Z]?)\b/i,
-    // "Policy Number: POL-123456" with separator chars
-    /policy\s*(?:no\.?|number|#|ref\.?)[:\s\-]+([A-Z0-9][A-Z0-9\-\/]{4,18})/i,
-    // "Ref/Certificate/Schedule No: ..."
-    /(?:ref(?:erence)?|cert(?:ificate)?|schedule|doc(?:ument)?)\s*(?:no\.?|number|#)?[:\s\-]+([A-Z0-9][A-Z0-9\-\/]{4,18})/i,
-    // "POL-123456" or "WN834106459" standalone (2 letters + 6-10 digits, or pure 8-12 digits)
-    /\b([A-Z]{2,4}\d{6,10})\b/,
-    /\b(\d{8,12})\b/,
-  ];
-  for (const r of numPatterns) {
-    const m = flat.match(r);
-    if (m) {
-      const candidate = m[1].replace(/\s+/g, '').trim();
-      // Reject if it looks like a phone number (starts with 0 or +)
-      if (!/^[\+0]/.test(candidate)) {
-        number = candidate;
-        break;
+  // Strategy 1: next-line label (e.g. "CERTIFICATE NUMBER\nCFYAM24-8368292")
+  const numNextLine = nextLineValue(/^(?:CERTIFICATE|POLICY|REFERENCE|SCHEDULE|DOCUMENT)\s*(?:NUMBER|NO\.?|#|REF\.?)?$/i);
+  if (numNextLine && /[A-Z0-9\-]{5,25}/.test(numNextLine) && !/^[\+0]/.test(numNextLine)) {
+    // Match tokens like CFYAM24-8368292, WN834106459, POL-123456, DL-7742839
+    const tok = numNextLine.match(/\b([A-Z]{1,8}(?:\d+[A-Z]*)?[\-]?\d{4,12})\b/i) ||
+                numNextLine.match(/\b([A-Z0-9][\-A-Z0-9]{5,24})\b/i);
+    number = tok ? tok[1].toUpperCase() : numNextLine.split(' ')[0];
+  }
+
+  // Strategy 2: inline label patterns
+  if (!number) {
+    const numPatterns = [
+      /policy\s*(?:no\.?|number|#|ref\.?|id)?[\s:\-]*([A-Z]{1,6}[\-]?\d{5,12}[A-Z]?\d*)\b/i,
+      /policy\s*(?:no\.?|number|#|ref\.?)[:\s\-]+([A-Z0-9][A-Z0-9\-\/]{4,18})/i,
+      /(?:ref(?:erence)?|cert(?:ificate)?|schedule|doc(?:ument)?)\s*(?:no\.?|number|#)?[:\s\-]+([A-Z0-9][A-Z0-9\-\/]{4,18})/i,
+    ];
+    for (const r of numPatterns) {
+      const m = flat.match(r);
+      if (m) {
+        const c = m[1].replace(/\s+/g, '').trim();
+        if (!/^[\+0]/.test(c)) { number = c; break; }
       }
     }
   }
 
+  // Strategy 3: shape-based fallback
+  if (!number) {
+    const m = flat.match(/\b([A-Z]{2,6}[\-]?\d{5,12})\b/);
+    if (m && !/^[\+0]/.test(m[1])) number = m[1];
+  }
+  if (!number) {
+    const m = flat.match(/\b(\d{8,12})\b/);
+    if (m) number = m[1];
+  }
+
   // ══ PHONE ══
-  // Priority order: emergency/claims lines first (most useful), then any phone
+  function cleanPhone(raw) {
+    let p = raw.replace(/\s+/g, ' ').trim();
+    p = p.replace(/[^0-9\+\(\)\-\s].*$/, '').trim();
+    p = p.replace(/\s*\($/, '').trim();
+    // Strip trailing 1-2 digit orphans (e.g. "24" from "24 hours, 365 days")
+    p = p.replace(/\s+\d{1,2}$/, '').trim();
+    return p;
+  }
+
   const phonePatterns = [
-    // "+44 (0) 1403 788 718" style — the (0) in the middle was breaking the old regex
-    /(?:emergency|medical\s+emergency|assistance)[^\n]{0,60}\n?[^\n]{0,30}(?:tel|call|phone)?[:\s]*(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    /(?:claim|claims)[^\n]{0,60}\n?[^\n]{0,30}(?:tel|call|phone)?[:\s]*(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    /(?:helpline|contact|call\s+us|customer\s+service|support)[^\n]{0,30}[:\s]*(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    // Tel: label inline
-    /\btel(?:ephone)?[:\s]+(\+?[\d][\d\s\-\(\)\.]{8,20})/i,
-    // +44 (0) XXXX format — specifically handles the (0) style
+    // "Medical Emergency/Repatriation\n+44 330 123 2370" — value on next line
+    /Medical\s+Emergency[^\n]*\n\s*(\+?[\d][\d\s\-\(\)\.]{8,18})/i,
+    // Emergency/assistance context with +44 nearby
+    /(?:emergency|assistance)[^\n]{0,60}\n\s*(\+44[\s\d\-\(\)\.]{8,16})/i,
+    // "+44 (0) XXXX" style
     /(\+44\s*\(0\)\s*[\d][\d\s\-]{6,14})/,
-    // +44 without (0)
-    /(\+44\s?[\d][\d\s\-]{8,13})/,
-    // UK freephone / local rate
-    /\b(0(?:800|808|845|870|118|1\d{2,3}|2\d|3\d{2})[\s\d\-\(\)]{6,12})\b/,
+    // "+44 XXX" without (0)
+    /(\+44\s?[\d\s\-]{9,14})/,
+    // Claims phone context
+    /(?:claim|claims)[^\n]{0,80}?(\+?[\d][\d\s\-\(\)\.]{8,16})/i,
+    // "call us on / tel:" inline — lowest priority
+    /(?:call\s+us\s+on|tel(?:ephone)?)[:\s]+(\+?[\d][\d\s\-\(\)\.]{7,16})/i,
+    // UK numbers
+    /\b(0(?:800|808|845|870|330|300|345|203|1\d{2,3}|2\d|3\d{2})[\s\d\-\(\)]{6,12})\b/,
   ];
   for (const r of phonePatterns) {
-    const m = text.match(r); // use text (with newlines) for multi-line patterns
+    const m = text.match(r);
     if (m) {
-      let p = m[1].replace(/\s+/g, ' ').trim();
-      // Clean up: remove anything after a non-phone char, including trailing open parens
-      p = p.replace(/[\s\(][^\d\+\(\)\-\s].*$/, '').trim();
-      p = p.replace(/\s*\($/, '').trim(); // strip trailing lone open paren
-      // Validate: must have at least 8 digits
-      if ((p.match(/\d/g) || []).length >= 8) {
-        phone = p;
-        break;
+      const p = cleanPhone(m[1]);
+      if ((p.match(/\d/g) || []).length >= 8 && (p.match(/\d/g) || []).length <= 15) {
+        phone = p; break;
       }
     }
   }
 
   // ══ INSURER ══
-  // For insurance docs: the selling/admin company is the insurer from user perspective
+  // Strategy 1: "issued by COMPANY" / "trading name of COMPANY" — stop at bracket or punctuation
   const insurerPatterns = [
-    // "sold and administered by COMPANY" — high quality signal
-    /(?:sold\s+and\s+administered|administered)\s+by\s+([A-Z][A-Za-z\s&\.\-']{2,45}?)(?:\s+who|\s+Ltd|\s+Limited|\s+PLC|\s+plc|,|\n)/i,
-    // "provided by / issued by COMPANY"
-    /(?:provided|issued|underwritten)\s+by\s+([A-Z][A-Za-z\s&\.\-']{2,45}?)(?:\s+Ltd|\s+Limited|\s+PLC|,|\.|Insurance\s+Services|\n)/i,
-    // Line that just says "COMPANY Insurance" or "COMPANY Cover" at start of line
-    /^([A-Z][A-Za-z\s&]{3,35}(?:\s+Insurance|\s+Cover|\s+Assurance|\s+Mutual|\s+Direct|\s+Life))\s*$/m,
-    // "Insurer: COMPANY"
-    /(?:insurer|insurance\s+company)[:\s]+([A-Za-z][A-Za-z\s&\.\-']{2,40}?)(?:\n|Ltd|PLC|plc|Limited)/i,
+    /issued\s+by\s+(CoverForYou|[A-Z][A-Za-z\s&\.\-']{2,45}?)(?:\s*[\(\,]|\s+an?\s|\s+insurance\s+intermediary)/i,
+    /trading\s+name\s+of\s+([A-Z][A-Za-z\s&\.\-']{3,50}?)(?:\s*[\(\)]|\s+Limited|\s+Ltd|,)/i,
+    /(?:sold\s+and\s+administered|administered)\s+by\s+([A-Z][A-Za-z\s&\.\-']{2,45}?)(?:\s+who|,|\n)/i,
+    /(?:provided|underwritten)\s+by\s+([A-Z][A-Za-z\s&\.\-']{2,45}?)(?:\s*[\(\,]|\s+which\s+is|,|\n)/i,
+    /^([A-Z][A-Za-z\s&]{3,35}(?:\s+Insurance|\s+Cover|\s+Assurance|\s+Direct|\s+Life))\s*$/m,
+    /(?:insurer|insurance\s+company)[:\s]+([A-Za-z][A-Za-z\s&\.\-']{2,40}?)(?:\n|Ltd|PLC|Limited)/i,
   ];
   for (const r of insurerPatterns) {
     const m = text.match(r);
     if (m) {
       const candidate = m[1].trim().replace(/\s+/g, ' ');
-      // Reject generic phrases
-      if (!/^(the|a|an|your|this|our)\b/i.test(candidate) && candidate.length > 3) {
-        insurer = candidate;
-        break;
+      if (!/^(the|a|an|your|this|our|inter\s+partner)\b/i.test(candidate) && candidate.length > 3) {
+        insurer = candidate; break;
       }
     }
   }
 
   // ══ EXPIRY DATE ══
-  // For travel: use Travel End Date. For others: expiry/renewal/valid until.
-  const datePatterns = [
-    // Travel End Date — specific to travel insurance docs
-    /travel\s+end\s+date[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-    /(?:cover(?:age)?\s+end(?:s)?|policy\s+end(?:s)?)[:\s\-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-    /(?:expir(?:y|es?|ation|ed?)|valid\s+(?:until|to)|renewal\s+(?:date)?|end\s+date)[:\s\-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-    /(?:expir(?:y|es?)|renewal)[:\s\-]*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i,
-  ];
-  for (const r of datePatterns) {
-    const m = flat.match(r);
-    if (m) {
-      expiry = parseDateToISO(m[1]);
-      if (expiry) break;
+  // Strategy 1: next-line value after "COVER PERIOD" label, then extract end date from range
+  const coverPeriodLine = nextLineValue(/^COVER\s*PERIOD$/i);
+  if (coverPeriodLine) {
+    // Range: "24/10/2024 to 28/10/2024" — take the END date
+    const rangeM = coverPeriodLine.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\s+to\s+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+    if (rangeM) expiry = parseDateToISO(rangeM[1]);
+    // Single date
+    if (!expiry) {
+      const singleM = coverPeriodLine.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/);
+      if (singleM) expiry = parseDateToISO(singleM[1]);
+    }
+  }
+
+  // Strategy 2: inline date range anywhere "DD/MM/YYYY to DD/MM/YYYY"
+  if (!expiry) {
+    const rangeM = flat.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\s+to\s+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+    if (rangeM) expiry = parseDateToISO(rangeM[1]);
+  }
+
+  // Strategy 3: labelled expiry keywords
+  if (!expiry) {
+    const datePatterns = [
+      /travel\s+end\s+date[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+      /(?:cover(?:age)?\s+end(?:s)?|policy\s+end(?:s)?)[:\s\-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+      /(?:expir(?:y|es?|ation|ed?)|valid\s+(?:until|to)|renewal\s+(?:date)?|end\s+date)[:\s\-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+      /(?:expir(?:y|es?)|renewal)[:\s\-]*(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i,
+    ];
+    for (const r of datePatterns) {
+      const m = flat.match(r);
+      if (m) { expiry = parseDateToISO(m[1]); if (expiry) break; }
     }
   }
 
   // ══ POLICY TYPE ══
-  // Check in priority order — more specific terms first
-  if (/\b(motor|vehicle|car\s+insur|comprehensive|third\s+party|road\s+risk)\b/.test(lower)) type = 'car';
-  else if (/\b(travel|trip|holiday\s+insurance|abroad|single\s+trip|annual\s+trip|bronze|silver|gold)\b/.test(lower)) type = 'travel';
-  else if (/\b(home|household|buildings|contents|landlord|property)\b/.test(lower)) type = 'home';
-  else if (/\b(private\s+medical|health\s+insur|dental|vision|bupa|axa\s+health)\b/.test(lower)) type = 'health';
-  else if (/\b(life\s+insur|life\s+cover|death\s+benefit|whole\s+life|term\s+life)\b/.test(lower)) type = 'life';
-  else if (/\b(pet|dog|cat|animal|veterinary)\b/.test(lower)) type = 'pet';
-  else if (/\b(public\s+liability|employer|commercial|business\s+insur|trade)\b/.test(lower)) type = 'business';
+  if      (/\b(motor|vehicle|car\s+insur|comprehensive|third\s+party|road\s+risk)\b/.test(lower))           type = 'car';
+  else if (/\b(travel|trip|holiday\s+insur|abroad|single\s+trip|annual\s+trip|repatriation|bronze|silver|gold)\b/.test(lower)) type = 'travel';
+  else if (/\b(home|household|buildings|contents|landlord|property)\b/.test(lower))                          type = 'home';
+  else if (/\b(private\s+medical|health\s+insur|dental|vision|bupa|axa\s+health)\b/.test(lower))            type = 'health';
+  else if (/\b(life\s+insur|life\s+cover|death\s+benefit|whole\s+life|term\s+life)\b/.test(lower))          type = 'life';
+  else if (/\b(pet|dog|cat|animal|veterinary)\b/.test(lower))                                                type = 'pet';
+  else if (/\b(public\s+liability|employer|commercial|business\s+insur|trade)\b/.test(lower))               type = 'business';
 
-  // ══ EXTRA NOTES — capture useful fields ══
-  // Premium
-  const premMatch = flat.match(/premium[:\s]+£?([\d,\.]+)/i);
-  if (premMatch) notes.push(`Premium: £${premMatch[1]}`);
-  // Destination (travel) — stop before next known label
-  const destMatch = flat.match(/destination[:\s]+([^\n]{3,80}?)(?:\s+Policy\s+Type|\s+Travel|\s+Lead|\s+Other|$)/i);
-  if (destMatch) notes.push(`Destination: ${destMatch[1].trim()}`);
-  // Lead traveller — name only, strip DOB in brackets
-  const travMatch = flat.match(/lead\s+traveller[:\s]+((?:Mr|Mrs|Ms|Miss|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
-  if (travMatch) notes.push(`Lead traveller: ${travMatch[1].trim()}`);
+  // ══ NOTES — extract useful supplementary fields ══
+  // Premium: "£37.02 TOTAL PRICE" or "TOTAL PRICE\n£37.02" or "Premium: £16.73"
+  const premNote = nextLineValue(/^TOTAL\s*PRICE/i);
+  const premM = (premNote && premNote.match(/£([\d,\.]+)/)) ||
+                flat.match(/£([\d,\.]+)\s*TOTAL\s*PRICE/i) ||
+                flat.match(/TOTAL\s*PRICE[^\n£]{0,20}£([\d,\.]+)/i) ||
+                flat.match(/premium[:\s]+£?([\d,\.]+)/i);
+  if (premM) notes.push(`Premium: £${premM[1]}`);
 
-  return { number, phone, insurer, expiry, type, notes: notes.join('\n') };
+  // Destination: next-line after "DESTINATIONS COVERED" label, or inline
+  const destNext = nextLineValue(/^DESTINATIONS?\s*(COVERED)?$/i);
+  if (destNext && destNext.length < 80) {
+    notes.push(`Destination: ${destNext}`);
+  } else {
+    const destM = flat.match(/destination[s]?\s*(?:covered)?[:\s]+([^\n]{3,80}?)(?:\s+Policy\s+Type|\s+Travel|\s+Lead|\s+INSURED|$)/i);
+    if (destM) notes.push(`Destination: ${destM[1].trim()}`);
+  }
+
+  // Lead insured person (first name on the list)
+  const insuredM = text.match(/(?:lead\s+traveller|insured\s+person)[:\s\n]+(?:\d+[\.\s]*)?((?:Mr|Mrs|Ms|Miss|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i) ||
+                   text.match(/(?:^|\n)\s*01[\.\s]+((?:[A-Z][a-z]+\s+){1,3}[A-Z][a-z]+)/m);
+  if (insuredM) notes.push(`Insured: ${insuredM[1].trim()}`);
+
+  // ══ CONFIDENCE SCORE ══
+  // Weighted by importance: policy number (30) + phone (20) + insurer (20) + expiry (20) + type (10)
+  let confidence = 0;
+  if (number)  confidence += 30;
+  if (phone)   confidence += 20;
+  if (insurer) confidence += 20;
+  if (expiry)  confidence += 20;
+  if (type && type !== 'other') confidence += 10;
+
+  return { number, phone, insurer, expiry, type, notes: notes.join('\n'), confidence };
 }
 
 function parseDateToISO(str) {
@@ -1982,47 +2048,89 @@ function parseDateToISO(str) {
   return '';
 }
 
-// ── Show OCR result in a reviewable sheet ──
+// ── Show OCR result as inline-editable review screen ──
 function showOCRResultSheet(extracted, rawText) {
-  const { number, phone, insurer, expiry, type, notes } = extracted;
+  const { number, phone, insurer, expiry, type, notes, confidence } = extracted;
   const hasAny = number || phone || insurer || expiry;
+
+  // Confidence indicator
+  const confColor = confidence >= 80 ? 'var(--green)' : confidence >= 50 ? 'var(--amber)' : 'var(--red)';
+  const confLabel = confidence >= 80 ? 'High confidence' : confidence >= 50 ? 'Review carefully' : 'Low confidence — check all fields';
+  const confIcon  = confidence >= 80 ? '✅' : confidence >= 50 ? '⚠️' : '❌';
+
   const typeOptions = POLICY_TYPES.map(t =>
     `<option value="${t.key}" ${type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`
   ).join('');
 
-  showSheet(`
-    <div class="sheet-title">${hasAny ? '✅ Document Scanned' : '⚠️ Scan Complete'}</div>
-    <div class="sheet-sub">${hasAny
-      ? 'Review the extracted fields below and tap "Use These Details" to pre-fill the form.'
-      : 'We couldn\'t reliably extract details. You can still fill the form manually, or try a clearer image.'
-    }</div>
+  // Build the full-page review screen (not a sheet — gives more room to edit)
+  let html = headerHTML('Review & Save') + `<div class="container page">`;
 
-    ${hasAny ? `
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-body" style="font-size:14px;display:flex;flex-direction:column;gap:10px">
-        <div class="field" style="margin:0"><label>Policy Type (detected)</label><select id="ocr_type">${typeOptions}</select></div>
-        ${insurer ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Insurer</span><div style="font-weight:600;margin-top:2px">${esc(insurer)}</div></div>` : ''}
-        ${number ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Policy Number</span><div style="font-family:'DM Mono',monospace;margin-top:2px">${esc(number)}</div></div>` : ''}
-        ${phone ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Phone</span><div style="margin-top:2px">${esc(phone)}</div></div>` : ''}
-        ${expiry ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Expiry / End Date</span><div style="margin-top:2px">${formatDate(expiry)}</div></div>` : ''}
-        ${notes ? `<div><span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.6px">Auto-filled Notes</span><div style="margin-top:2px;font-size:13px;color:var(--text-2);line-height:1.5">${esc(notes)}</div></div>` : ''}
+  // Confidence bar
+  html += `<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:700;color:${confColor}">${confIcon} ${confLabel}</div>
+      <div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;margin-top:8px;overflow:hidden">
+        <div style="height:100%;width:${confidence}%;background:${confColor};border-radius:3px;transition:width 0.4s"></div>
       </div>
     </div>
-    <button class="btn btn-primary" onclick="applyOCRResult(${JSON.stringify(extracted).replace(/"/g,'&quot;')})">✅ Use These Details</button>
-    ` : ''}
+    <div style="font-size:20px;font-weight:800;color:${confColor}">${confidence}%</div>
+  </div>`;
 
-    <button class="btn btn-ghost" onclick="closeSheet();renderAdd();" style="margin-top:${hasAny?'4':'0'}px">✏️ Fill In Manually</button>
+  html += `<div style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+    Fields extracted from your document are pre-filled below. Edit anything that looks wrong before saving.
+  </div>`;
 
-    <details style="margin-top:16px">
-      <summary style="font-size:12px;color:var(--text-3);cursor:pointer">Show extracted text</summary>
-      <div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text-2);background:var(--card);border-radius:8px;padding:10px;margin-top:8px;max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">${esc(rawText.slice(0,2000))}</div>
-    </details>
-  `);
+  // Editable form — same fields as renderAdd but pre-filled
+  html += `
+    <div class="field">
+      <label>Policy Type</label>
+      <select id="f_type">${typeOptions}</select>
+    </div>
+    <div class="field">
+      <label>Insurer / Company Name ${!insurer ? '<span style="color:var(--amber);font-size:10px;margin-left:4px">NOT FOUND</span>' : ''}</label>
+      <input id="f_insurer" placeholder="e.g. Aviva, AXA, Direct Line" value="${esc(insurer || '')}">
+    </div>
+    <div class="field">
+      <label>Policy Number ${!number ? '<span style="color:var(--amber);font-size:10px;margin-left:4px">NOT FOUND</span>' : ''}</label>
+      <input id="f_number" placeholder="e.g. POL-123456" value="${esc(number || '')}">
+    </div>
+    <div class="field">
+      <label>Claims / Contact Phone ${!phone ? '<span style="color:var(--amber);font-size:10px;margin-left:4px">NOT FOUND</span>' : ''}</label>
+      <input id="f_phone" type="tel" placeholder="+44 800 000 0000" value="${esc(phone || '')}">
+    </div>
+    <div class="field">
+      <label>Expiry / End Date ${!expiry ? '<span style="color:var(--amber);font-size:10px;margin-left:4px">NOT FOUND</span>' : ''}</label>
+      <input id="f_expiry" type="date" value="${esc(expiry || '')}">
+    </div>
+    <div class="field">
+      <label>Emergency Contact (optional)</label>
+      <input id="f_emergency" placeholder="Name or number for emergencies" value="">
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <textarea id="f_notes" placeholder="Excess amount, coverage details...">${esc(notes || '')}</textarea>
+    </div>
+  `;
+
+  html += `<button class="btn btn-primary" onclick="savePolicy()" style="margin-top:4px">💾 Save Policy</button>`;
+
+  // Raw text collapsible at the bottom
+  html += `<details style="margin-top:20px;margin-bottom:8px">
+    <summary style="font-size:12px;color:var(--text-3);cursor:pointer;list-style:none">▶ Show extracted text</summary>
+    <div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text-2);background:var(--card);border-radius:8px;padding:10px;margin-top:8px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">${esc(rawText.slice(0, 2500))}</div>
+  </details>`;
+
+  html += `</div>`;
+
+  // Render as a full page, not a sheet
+  closeSheet();
+  activeTab = 'add';
+  editingPolicyId = null;
+  document.getElementById('app').innerHTML = html;
 }
 
 function applyOCRResult(extracted) {
-  const typeEl = document.getElementById('ocr_type');
-  if (typeEl) extracted.type = typeEl.value;
+  // Legacy — now handled inline in showOCRResultSheet
   closeSheet();
   renderAdd(extracted);
 }
