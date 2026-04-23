@@ -2633,8 +2633,35 @@ async function doBackup() {
 
     // Record last backup time
     localStorage.setItem('coverly_last_backup', Date.now().toString());
-    closeSheet();
-    toast('✅ Backup downloaded!', 3000);
+
+    // Show clear instructions — don't just toast, users need to know NOT to tap the file
+    showSheet(`
+      <div class="sheet-title">✅ Backup Downloaded!</div>
+      <div class="sheet-sub">Your encrypted backup file has been saved to your Downloads folder.</div>
+
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:20px;flex-shrink:0">1️⃣</span>
+            <div style="font-size:14px;line-height:1.5"><b>Move the file somewhere safe</b><br><span style="color:var(--text-2)">Google Drive, iCloud, email yourself, USB — your choice. Coverly never sees it.</span></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:20px;flex-shrink:0">2️⃣</span>
+            <div style="font-size:14px;line-height:1.5"><b>Don't tap the file to open it</b><br><span style="color:var(--text-2)">Android won't know what to do with a <b>.coverly</b> file. Always restore from inside Coverly instead.</span></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:20px;flex-shrink:0">3️⃣</span>
+            <div style="font-size:14px;line-height:1.5"><b>To restore</b><br><span style="color:var(--text-2)">Open Coverly → Settings → Restore from Backup → choose the file → enter your password.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--amber-dim);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:12px">
+        🔑 <b style="color:var(--text)">Remember your password.</b> There is no way to recover your backup without it.
+      </div>
+
+      <button class="btn btn-primary" onclick="closeSheet()">Got it</button>
+    `);
   } catch (err) {
     if (btn) { btn.textContent = '⬇️ Download Backup File'; btn.disabled = false; }
     errEl.textContent = 'Encryption failed — please try again';
@@ -2643,23 +2670,56 @@ async function doBackup() {
 
 // ── Restore backup ──
 function startRestore() {
+  restoreFileBuffer = null; // clear any previous
   showSheet(`
     <div class="sheet-title">📂 Restore from Backup</div>
-    <div class="sheet-sub">Select your <b>.coverly</b> backup file and enter the password you used when you created it.</div>
-    <div class="field"><label>Backup File</label>
-      <button class="btn btn-ghost" onclick="document.getElementById('restoreInput').click()" style="text-align:left">
-        📁 Choose .coverly file
-      </button>
-      <div id="restoreFileName" style="font-size:12px;color:var(--text-2);margin-top:6px"></div>
+    <div class="sheet-sub">Open Coverly, then select your backup file from here — don't tap the file directly in your file manager.</div>
+
+    <div style="background:var(--blue-dim);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:14px">
+      📁 The file is in your <b style="color:var(--text)">Downloads</b> folder, named <b style="color:var(--text)">coverly-backup-YYYY-MM-DD.coverly</b>
     </div>
-    <div class="field"><label>Backup Password</label><input id="rp" type="password" placeholder="Enter your backup password" autocomplete="current-password"></div>
+
+    <div class="field"><label>Step 1 — Choose your backup file</label>
+      <button class="btn btn-ghost" onclick="document.getElementById('restoreInput').click()" style="text-align:left;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">📁</span><span>Choose .coverly file</span>
+      </button>
+      <div id="restoreFileName" style="font-size:13px;color:var(--green);margin-top:8px;font-weight:600"></div>
+    </div>
+
+    <div class="field"><label>Step 2 — Enter your backup password</label>
+      <input id="rp" type="password" placeholder="Enter the password you set when backing up" autocomplete="current-password">
+    </div>
+
     <div id="restoreErr" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
     <button class="btn btn-primary" id="restoreBtn" onclick="doRestore()">🔓 Restore Policies</button>
     <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
     <div style="font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6">
-      ⚠️ Restoring will <b>add</b> policies from the backup to your current vault. It won't delete existing policies.
+      ⚠️ Restoring will <b>add</b> policies from the backup to your current vault. Existing policies won't be deleted.
     </div>
   `);
+}
+
+// Called when Coverly is launched by tapping a .coverly file (File Handling API)
+function startRestoreWithFile(filename) {
+  renderHome(); // render home first so there's a page behind the sheet
+  setTimeout(() => {
+    showSheet(`
+      <div class="sheet-title">📂 Restore Backup</div>
+      <div class="sheet-sub">Coverly found a backup file. Enter your password to restore your policies.</div>
+
+      <div style="background:var(--green-dim);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--text-2);margin-bottom:14px">
+        📎 <b style="color:var(--text)">${esc(filename)}</b> — ready to restore
+      </div>
+
+      <div class="field"><label>Backup Password</label>
+        <input id="rp" type="password" placeholder="Enter the password you set when backing up" autocomplete="current-password">
+      </div>
+
+      <div id="restoreErr" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:8px"></div>
+      <button class="btn btn-primary" id="restoreBtn" onclick="doRestore()">🔓 Restore Policies</button>
+      <button class="btn btn-ghost" onclick="closeSheet()" style="margin-top:4px">Cancel</button>
+    `);
+  }, 400);
 }
 
 let restoreFileBuffer = null;
@@ -2774,6 +2834,22 @@ function dismissBackupBanner() {
 async function boot() {
   await initDB();
   getLocation();
+
+  // ── File Handling API: if Coverly was launched by opening a .coverly file ──
+  if ('launchQueue' in window) {
+    window.launchQueue.setConsumer(async launchParams => {
+      if (!launchParams.files || launchParams.files.length === 0) return;
+      const fileHandle = launchParams.files[0];
+      const file = await fileHandle.getFile();
+      if (file.name.endsWith('.coverly')) {
+        await initDB(); // ensure DB ready
+        restoreFileBuffer = await file.arrayBuffer();
+        // Show restore sheet pre-loaded with file
+        startRestoreWithFile(file.name);
+        return;
+      }
+    });
+  }
 
   const onboarded = localStorage.getItem('coverly_onboarded');
   if (!onboarded) {
