@@ -1867,13 +1867,19 @@ function extractPolicyData(rawText) {
   }
 
   // ══ POLICY NUMBER ══
-  // Strategy 1: next-line label (e.g. "CERTIFICATE NUMBER\nCFYAM24-8368292")
+  // Strategy 1: next-line label (e.g. "CERTIFICATE NUMBER\nCFYAM24-8368292" or "CFYAM24 - 8368292")
   const numNextLine = nextLineValue(/^(?:CERTIFICATE|POLICY|REFERENCE|SCHEDULE|DOCUMENT)\s*(?:NUMBER|NO\.?|#|REF\.?)?$/i);
-  if (numNextLine && /[A-Z0-9\-]{5,25}/.test(numNextLine) && !/^[\+0]/.test(numNextLine)) {
-    // Match tokens like CFYAM24-8368292, WN834106459, POL-123456, DL-7742839
-    const tok = numNextLine.match(/\b([A-Z]{1,8}(?:\d+[A-Z]*)?[\-]?\d{4,12})\b/i) ||
-                numNextLine.match(/\b([A-Z0-9][\-A-Z0-9]{5,24})\b/i);
-    number = tok ? tok[1].toUpperCase() : numNextLine.split(' ')[0];
+  if (numNextLine && /[A-Z0-9\-\s]{5,30}/.test(numNextLine) && !/^[\+0]/.test(numNextLine)) {
+    // Match alphanumeric segments joined by optional-spaced hyphens: "CFYAM24 - 8368292", "POL-123456"
+    const tok = numNextLine.match(/\b([A-Z]{1,8}\d*(?:\s*-\s*[A-Z0-9]+){1,4})\b/i) ||
+                numNextLine.match(/\b([A-Z]{2,6}\d{5,12})\b/i) ||
+                numNextLine.match(/\b(\d{8,12})\b/);
+    if (tok) {
+      // Normalise spaces around hyphens → no spaces
+      number = tok[1].replace(/\s*-\s*/g, '-').toUpperCase();
+    } else {
+      number = numNextLine.split(' ')[0];
+    }
   }
 
   // Strategy 2: inline label patterns
@@ -1892,10 +1898,12 @@ function extractPolicyData(rawText) {
     }
   }
 
-  // Strategy 3: shape-based fallback
+  // Strategy 3: shape-based fallback — also handles spaced hyphens in flat text
   if (!number) {
-    const m = flat.match(/\b([A-Z]{2,6}[\-]?\d{5,12})\b/);
-    if (m && !/^[\+0]/.test(m[1])) number = m[1];
+    // Match e.g. "CFYAM24 - 8368292" or "WN834106459"
+    const m = flat.match(/\b([A-Z]{1,8}\d*(?:\s*-\s*[A-Z0-9]+){1,4})\b/i) ||
+              flat.match(/\b([A-Z]{2,6}[\-]?\d{5,12})\b/);
+    if (m && !/^[\+0]/.test(m[1])) number = m[1].replace(/\s*-\s*/g, '-').toUpperCase();
   }
   if (!number) {
     const m = flat.match(/\b(\d{8,12})\b/);
@@ -2536,13 +2544,19 @@ function renderOnboarding() {
   `;
 }
 
-function nextOnboard() {
+async function nextOnboard() {
   if (onboardStep < ONBOARD_STEPS.length - 1) {
     onboardStep++;
     renderOnboarding();
   } else {
     localStorage.setItem('coverly_onboarded', '1');
-    renderHome();
+    await renderHome();
+    // Offer demo data after onboarding if vault is empty
+    const policies = await getPolicies();
+    if (policies.length === 0 && !localStorage.getItem('coverly_demo_asked')) {
+      localStorage.setItem('coverly_demo_asked', '1');
+      setTimeout(confirmLoadDemo, 1000);
+    }
   }
 }
 
@@ -2970,12 +2984,13 @@ async function boot() {
     return;
   }
 
-  // Seed demo data once if vault is empty and never seeded
+  // Seed demo data once if vault is empty — show prompt after user has settled on home screen
   const policies = await getPolicies();
   if (policies.length === 0 && !localStorage.getItem('coverly_demo_asked')) {
     localStorage.setItem('coverly_demo_asked', '1');
-    renderHome();
-    setTimeout(confirmLoadDemo, 600);
+    await renderHome();
+    // Give user time to see home screen before the sheet appears
+    setTimeout(confirmLoadDemo, 1800);
     return;
   }
 
