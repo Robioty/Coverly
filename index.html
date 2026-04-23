@@ -848,7 +848,6 @@ function navHTML(active) {
     { id: 'dashboard', icon: '📊', label: 'Overview' },
     { id: 'emergency', icon: '🚨', label: 'Emergency' },
     { id: 'add', icon: '＋', label: 'Add' },
-    { id: 'scan', icon: '📷', label: 'Scan' },
   ];
   return `<div class="nav">${tabs.map(t =>
     `<button class="nav-btn ${active === t.id ? 'active' : ''}" onclick="navTap('${t.id}')">
@@ -863,8 +862,81 @@ function navTap(tab) {
   if (tab === 'home') renderHome();
   else if (tab === 'dashboard') renderDashboard();
   else if (tab === 'emergency') renderEmergency();
-  else if (tab === 'add') renderAdd();
-  else if (tab === 'scan') renderScan();
+  else if (tab === 'add') showAddSheet();
+}
+
+// ── Sheet that appears when tapping Add in nav ──
+function showAddSheet() {
+  showSheet(`
+    <div class="sheet-title">Add Policy</div>
+    <div class="sheet-sub">How would you like to add your insurance policy?</div>
+
+    <button class="btn btn-primary" onclick="closeSheet();startOCRPDF()" style="display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:16px 18px">
+      <span style="font-size:22px">📄</span>
+      <span style="text-align:left">
+        <span style="display:block;font-size:15px">Upload PDF</span>
+        <span style="display:block;font-size:12px;opacity:0.75;font-weight:400;margin-top:1px">Best results — reads text directly</span>
+      </span>
+    </button>
+
+    <button class="btn btn-ghost" onclick="closeSheet();renderAdd()" style="display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:16px 18px;margin-top:4px">
+      <span style="font-size:22px">✏️</span>
+      <span style="text-align:left">
+        <span style="display:block;font-size:15px">Enter Manually</span>
+        <span style="display:block;font-size:12px;opacity:0.75;font-weight:400;margin-top:1px">Type in your policy details</span>
+      </span>
+    </button>
+
+    <button class="btn btn-ghost" onclick="closeSheet();showScanDocSheet()" style="display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:16px 18px;margin-top:4px">
+      <span style="font-size:22px">📷</span>
+      <span style="text-align:left">
+        <span style="display:block;font-size:15px">Scan Document</span>
+        <span style="display:block;font-size:12px;opacity:0.75;font-weight:400;margin-top:1px">Photo or image file via OCR</span>
+      </span>
+    </button>
+
+    <button class="btn btn-ghost" onclick="closeSheet();showQRImportSheet()" style="display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:16px 18px;margin-top:4px">
+      <span style="font-size:22px">📲</span>
+      <span style="text-align:left">
+        <span style="display:block;font-size:15px">Import via QR Code</span>
+        <span style="display:block;font-size:12px;opacity:0.75;font-weight:400;margin-top:1px">Scan a Coverly QR from another device</span>
+      </span>
+    </button>
+  `);
+}
+
+function showScanDocSheet() {
+  showSheet(`
+    <div class="sheet-title">📷 Scan Document</div>
+    <div class="sheet-sub">Take a photo or choose an image file. Coverly will extract your policy details automatically.</div>
+    <button class="btn btn-primary" onclick="closeSheet();startOCRCamera()" style="margin-top:4px">📸 Take Photo</button>
+    <button class="btn btn-ghost" onclick="closeSheet();startOCRFile()" style="margin-top:4px">🖼️ Choose Image File</button>
+    <div style="font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6">
+      💡 Lay the document flat in good lighting. Avoid shadows across the text.
+    </div>
+  `);
+}
+
+function showQRImportSheet() {
+  showSheet(`
+    <div class="sheet-title">📲 Import via QR</div>
+    <div class="sheet-sub">Point your camera at a Coverly QR code to import all policies from another device instantly.</div>
+    <button class="btn btn-primary" onclick="closeSheet();startQRScanDirect()" style="margin-top:4px">📷 Start QR Scanner</button>
+    <div style="font-size:12px;color:var(--text-3);margin-top:16px;line-height:1.6">
+      The QR code is generated in Settings → Export via QR on the source device.
+    </div>
+  `);
+}
+
+function startQRScanDirect() {
+  // Navigate to a minimal QR scan view
+  activeTab = 'home';
+  let html = headerHTML('Scan QR Code') + `<div class="container page">
+    <p style="font-size:14px;color:var(--text-2);margin-bottom:12px">Point your camera at a Coverly QR code.</p>
+    <div id="scanArea"></div>
+  </div>`;
+  document.getElementById('app').innerHTML = html;
+  startQRScan();
 }
 
 function goBack() {
@@ -891,10 +963,10 @@ async function renderHome() {
       <button class="hero-action-btn" onclick="navTap('emergency')">
         <span>🚨</span><span>Emergency</span>
       </button>
-      <button class="hero-action-btn" onclick="navTap('add')">
+      <button class="hero-action-btn" onclick="showAddSheet()">
         <span>＋</span><span>Add Policy</span>
       </button>
-      <button class="hero-action-btn" onclick="navTap('scan')">
+      <button class="hero-action-btn" onclick="showScanDocSheet()">
         <span>📷</span><span>Scan Doc</span>
       </button>
       <button class="hero-action-btn" onclick="exportQR()">
@@ -2057,7 +2129,8 @@ let pinTemp = '';
 function renderPinScreen(mode = 'unlock') {
   pinMode = mode;
   pinBuffer = '';
-  pinTemp = '';
+  // Only reset pinTemp when starting fresh — NOT when moving to confirm screen
+  if (mode !== 'confirm') pinTemp = '';
   const titles = {
     unlock: ['Enter PIN', 'Enter your PIN to unlock Coverly'],
     set: ['Set a PIN', 'Choose a 4-digit PIN to secure your vault'],
@@ -2080,6 +2153,7 @@ function renderPinScreen(mode = 'unlock') {
         }).join('')}
       </div>
       ${mode === 'unlock' ? `<button style="background:none;border:none;color:var(--text-3);font-size:13px;margin-top:24px;cursor:pointer" onclick="forgotPin()">Forgot PIN?</button>` : ''}
+      ${mode === 'confirm' ? `<button style="background:none;border:none;color:var(--text-3);font-size:13px;margin-top:24px;cursor:pointer" onclick="renderPinScreen('set')">← Start over</button>` : ''}
     </div>
   `;
 }
@@ -2092,7 +2166,7 @@ function pinTap(key) {
     pinBuffer += key;
   }
   updatePinDots();
-  if (pinBuffer.length === 4) setTimeout(checkPin, 100);
+  if (pinBuffer.length === 4) setTimeout(checkPin, 150);
 }
 
 function updatePinDots() {
@@ -2113,8 +2187,7 @@ function checkPin() {
       updatePinDots();
     }
   } else if (pinMode === 'set') {
-    pinTemp = pinBuffer;
-    pinBuffer = '';
+    pinTemp = pinBuffer; // save BEFORE calling renderPinScreen
     renderPinScreen('confirm');
   } else if (pinMode === 'confirm') {
     if (pinBuffer === pinTemp) {
@@ -2127,7 +2200,7 @@ function checkPin() {
       toast('🔐 PIN set successfully');
       renderSettings();
     } else {
-      document.getElementById('pinError').textContent = '❌ PINs do not match';
+      document.getElementById('pinError').textContent = '❌ PINs do not match — try again';
       pinBuffer = '';
       updatePinDots();
     }
@@ -2299,10 +2372,30 @@ function closeSheet() {
    ONBOARDING
 ═══════════════════════════════════════ */
 const ONBOARD_STEPS = [
-  { icon: '🛡️', title: 'Your Private\nInsurance Vault', text: 'Store all your policy details safely on your device. No accounts, no cloud, no tracking — ever.' },
-  { icon: '🚨', title: 'Emergency\nReady', text: 'In an accident? One tap to call your insurer, send your location, or message via SMS or WhatsApp.' },
-  { icon: '📷', title: 'Scan to\nAdd Policies', text: 'Photograph your insurance documents and Coverly will automatically extract your policy details.' },
-  { icon: '📡', title: 'Works\nOffline', text: "Fully functional without the internet. Your data stays on your phone where it belongs." },
+  {
+    icon: '🛡️',
+    title: 'Your Data.\nNobody Else\'s.',
+    text: 'Coverly stores everything on your device only. No accounts. No servers. No third parties ever see your data — not even us.',
+    highlights: ['🔒 Zero cloud storage', '👤 No accounts required', '📵 No tracking, ever'],
+  },
+  {
+    icon: '🚨',
+    title: 'Emergency\nReady in One Tap',
+    text: 'Accident or crisis? Instantly call your insurer, or send your policy number and live GPS location via SMS or WhatsApp — even without internet.',
+    highlights: ['📞 One-tap insurer call', '📍 Live location sharing', '💬 SMS & WhatsApp ready'],
+  },
+  {
+    icon: '🔐',
+    title: 'Encrypted\nBackup You Control',
+    text: 'Back up with a password you choose. The encrypted file saves to wherever you want — Google Drive, iCloud, email. Coverly never touches it.',
+    highlights: ['🔑 AES-256 encryption', '☁️ Your storage, your choice', '📲 Restore on any device'],
+  },
+  {
+    icon: '📲',
+    title: 'Transfer Without\nthe Internet',
+    text: 'Move all your policies to a new phone instantly using a QR code — no internet, no cables, no accounts needed.',
+    highlights: ['⬆️ QR export in seconds', '📷 Scan to import instantly', '📡 Fully offline'],
+  },
 ];
 
 let onboardStep = 0;
@@ -2319,10 +2412,16 @@ function renderOnboarding() {
         <div class="onboard-icon">${s.icon}</div>
         <div class="onboard-title">${s.title.replace('\n', '<br>')}</div>
         <div class="onboard-text">${s.text}</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          ${s.highlights.map(h => `
+            <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600">
+              ${h}
+            </div>`).join('')}
+        </div>
       </div>
-      <div class="onboard-dots">${dots}</div>
-      <button class="btn btn-primary" onclick="nextOnboard()">
-        ${onboardStep < ONBOARD_STEPS.length - 1 ? 'Continue →' : "Let's Go 🚀"}
+      <div class="onboard-dots" style="margin-top:28px">${dots}</div>
+      <button class="btn btn-primary" onclick="nextOnboard()" style="margin-top:12px">
+        ${onboardStep < ONBOARD_STEPS.length - 1 ? 'Continue →' : "Get Started 🚀"}
       </button>
       ${onboardStep > 0 ? `<button class="btn btn-ghost" onclick="onboardStep--;renderOnboarding()" style="margin-top:4px">← Back</button>` : ''}
     </div>
