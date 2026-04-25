@@ -1,6 +1,7 @@
 {
   "name": "Coverly – Insurance Vault",
   "short_name": "Coverly",
+  "version": "1.0.0-beta",
   "description": "Privacy-first, offline insurance vault for emergencies",
   "start_url": "/",
   "display": "standalone",
@@ -10,16 +11,26 @@
   "categories": ["finance", "utilities"],
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "icon-192-coverly.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "icon-512-coverly.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "application/octet-stream": [".coverly"],
+        "application/coverly": [".coverly"]
+      },
+      "launch_type": "single-client"
     }
   ],
   "screenshots": [
@@ -37,14 +48,14 @@
       "short_name": "Emergency",
       "description": "Access emergency mode",
       "url": "/?tab=emergency",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "icon-192-coverly.png", "sizes": "192x192" }]
     },
     {
       "name": "Add Policy",
       "short_name": "Add",
       "description": "Add a new insurance policy",
       "url": "/?tab=add",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "icon-192-coverly.png", "sizes": "192x192" }]
     }
   ],
   "related_applications": [],
