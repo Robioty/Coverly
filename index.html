@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Coverly">
+<meta name="coverly-version" content="1.0.0-beta-sw11">
 <title>Coverly</title>
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -307,25 +308,6 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .hero-greeting { font-size: 13px; color: var(--text-2); margin-bottom: 2px; }
 .hero-title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
 .hero-count { font-size: 13px; color: var(--text-2); margin-top: 4px; }
-.hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
-.hero-action-btn {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.15s;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-.hero-action-btn span:first-child { font-size: 20px; }
-.hero-action-btn:active { background: rgba(255,255,255,0.1); }
 
 /* ── Toast ── */
 .toast {
@@ -691,6 +673,48 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 'use strict';
 
 /* ═══════════════════════════════════════
+   VERSION
+═══════════════════════════════════════ */
+const APP_VERSION = '1.0.0-beta';
+const SW_VERSION  = 'v11';
+
+/* ═══════════════════════════════════════
+   ERROR BOUNDARY
+═══════════════════════════════════════ */
+window.onerror = function(msg, src, line, col, err) {
+  console.error('Coverly error:', msg, src, line, col, err);
+  const app = document.getElementById('app');
+  if (app && app.innerHTML.trim() === '') {
+    app.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:32px;text-align:center;font-family:'DM Sans',sans-serif;background:#0a0f1e;color:#f1f5f9">
+        <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:8px">Something went wrong</div>
+        <div style="font-size:14px;color:#94a3b8;margin-bottom:32px;line-height:1.6">
+          Coverly hit an unexpected error. Your data is safe — tap below to reload.
+        </div>
+        <button onclick="location.reload()" style="background:#3b82f6;color:#fff;border:none;border-radius:14px;padding:14px 28px;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer">
+          🔄 Reload App
+        </button>
+        <div style="font-size:11px;color:#475569;margin-top:24px;font-family:'DM Mono',monospace;max-width:300px;word-break:break-all">${msg}</div>
+      </div>`;
+  }
+  return false; // don't suppress console
+};
+
+window.onunhandledrejection = function(e) {
+  console.error('Coverly unhandled promise rejection:', e.reason);
+};
+
+/* ═══════════════════════════════════════
+   HAPTICS
+═══════════════════════════════════════ */
+function haptic(style = 'light') {
+  if (!navigator.vibrate) return;
+  const patterns = { light: [8], medium: [15], heavy: [30], success: [10, 50, 10], error: [50, 30, 50] };
+  navigator.vibrate(patterns[style] || patterns.light);
+}
+
+/* ═══════════════════════════════════════
    STATE
 ═══════════════════════════════════════ */
 let db = null;
@@ -952,28 +976,92 @@ async function renderHome() {
   activeTab = 'home';
   const policies = await getPolicies();
   const count = policies.length;
+  const now = new Date();
+
+  // Compute snapshot stats
+  const withExpiry   = policies.filter(p => p.expiry);
+  const expired      = withExpiry.filter(p => new Date(p.expiry) < now);
+  const expiring30   = withExpiry.filter(p => { const d = daysUntil(p.expiry); return d >= 0 && d <= 30; });
+  const expiring90   = withExpiry.filter(p => { const d = daysUntil(p.expiry); return d > 30 && d <= 90; });
+  const activeCount  = count - expired.length;
+
+  // Next policy to expire (soonest future expiry)
+  const upcoming = withExpiry
+    .filter(p => daysUntil(p.expiry) >= 0)
+    .sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
+  const nextExpiring = upcoming[0] || null;
 
   let html = homeHeaderHTML(count) + `<div class="container page">`;
 
+  // ── Hero: greeting + emergency only ──
   html += `<div class="home-hero">
-    <div class="hero-greeting">Your insurance vault</div>
-    <div class="hero-title">Good ${getTimeOfDay()}</div>
-    <div class="hero-count">${count === 0 ? 'No policies stored' : `${count} polic${count === 1 ? 'y' : 'ies'} stored safely`}</div>
-    <div class="hero-actions">
-      <button class="hero-action-btn" onclick="navTap('emergency')">
-        <span>🚨</span><span>Emergency</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div>
+        <div class="hero-greeting">Good ${getTimeOfDay()}</div>
+        <div class="hero-title" style="font-size:20px">${count === 0 ? 'Welcome to Coverly' : `${count} polic${count === 1 ? 'y' : 'ies'} stored`}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="navTap('emergency')" style="display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:14px;flex-shrink:0">
+        🚨 Emergency
       </button>
-      <button class="hero-action-btn" onclick="showAddSheet()">
-        <span>＋</span><span>Add Policy</span>
-      </button>
-      <button class="hero-action-btn" onclick="showScanDocSheet()">
-        <span>📷</span><span>Scan Doc</span>
-      </button>
-      <button class="hero-action-btn" onclick="exportQR()">
-        <span>⬆️</span><span>Export QR</span>
-      </button>
-    </div>
-  </div>`;
+    </div>`;
+
+  if (count === 0) {
+    // Empty state inline — prompt to add first policy
+    html += `<div style="text-align:center;padding:16px 0 8px">
+      <div style="font-size:36px;margin-bottom:8px">🛡️</div>
+      <div style="font-size:14px;color:var(--text-2);margin-bottom:12px">Add your first policy to get started</div>
+      <button class="btn btn-primary" onclick="showAddSheet()" style="margin:0">＋ Add First Policy</button>
+    </div>`;
+  } else {
+    // ── Coverage snapshot strip ──
+    html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:${(expired.length > 0 || expiring30.length > 0) ? '10' : '0'}px">
+      <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:var(--green)">${activeCount}</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-2);margin-top:2px">Active</div>
+      </div>
+      <div style="background:${expiring30.length > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)'};border:1px solid ${expiring30.length > 0 ? 'rgba(245,158,11,0.25)' : 'var(--border)'};border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:${expiring30.length > 0 ? 'var(--amber)' : 'var(--text-3)'}">${expiring30.length + expiring90.length}</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-2);margin-top:2px">Renewing</div>
+      </div>
+      <div style="background:${expired.length > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)'};border:1px solid ${expired.length > 0 ? 'rgba(239,68,68,0.25)' : 'var(--border)'};border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:${expired.length > 0 ? 'var(--red)' : 'var(--text-3)'}">${expired.length}</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-2);margin-top:2px">Expired</div>
+      </div>
+    </div>`;
+
+    // Alert banners for urgent/expired policies
+    if (expired.length > 0) {
+      html += `<div onclick="navTap('dashboard')" style="cursor:pointer;display:flex;align-items:center;gap:10px;background:var(--red-dim);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 12px;margin-top:8px">
+        <span style="font-size:18px">⚠️</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--red)">${expired.length} expired polic${expired.length === 1 ? 'y' : 'ies'}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:1px">${expired.map(p => p.insurer || getPolicyMeta(p.type).label).join(', ')}</div>
+        </div>
+        <span style="color:var(--text-3);font-size:16px">›</span>
+      </div>`;
+    }
+    if (expiring30.length > 0) {
+      html += `<div onclick="navTap('dashboard')" style="cursor:pointer;display:flex;align-items:center;gap:10px;background:var(--amber-dim);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:10px 12px;margin-top:8px">
+        <span style="font-size:18px">🕐</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--amber)">${expiring30.length} expiring within 30 days</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:1px">${expiring30.map(p => `${p.insurer || getPolicyMeta(p.type).label} (${daysUntil(p.expiry)}d)`).join(', ')}</div>
+        </div>
+        <span style="color:var(--text-3);font-size:16px">›</span>
+      </div>`;
+    }
+
+    // Next expiry chip
+    if (nextExpiring && expiring30.length === 0 && expired.length === 0) {
+      const meta = getPolicyMeta(nextExpiring.type);
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text-2)">
+        <span>${meta.icon}</span>
+        <span>Next renewal: <b style="color:var(--text)">${esc(nextExpiring.insurer || meta.label)}</b> — ${formatDate(nextExpiring.expiry)}</span>
+      </div>`;
+    }
+  }
+
+  html += `</div>`; // close home-hero
 
   if (locationStr) {
     html += `<div class="location-bar">
@@ -982,13 +1070,7 @@ async function renderHome() {
     </div>`;
   }
 
-  if (count === 0) {
-    html += `<div class="empty">
-      <div class="empty-icon">🛡️</div>
-      <div class="empty-title">No policies yet</div>
-      <div class="empty-text">Add your first policy to keep your insurance details safe and accessible — even offline.</div>
-    </div>`;
-  } else {
+  if (count > 0) {
     html += `<div class="section-label">Your Policies</div>`;
     policies.forEach(p => {
       const meta = getPolicyMeta(p.type);
@@ -1509,15 +1591,17 @@ async function savePolicy() {
     notes: document.getElementById('f_notes').value.trim(),
   };
 
-  if (!data.number) { toast('⚠️ Policy number is required'); return; }
+  if (!data.number) { haptic('error'); toast('⚠️ Policy number is required'); return; }
 
   if (editingPolicyId) {
     const policies = await getPolicies();
     const existing = policies.find(x => x.id === editingPolicyId);
     await updatePolicy({ ...existing, ...data });
+    haptic('success');
     toast('✅ Policy updated');
   } else {
     await addPolicy(data);
+    haptic('success');
     toast('✅ Policy saved');
   }
 
@@ -1576,7 +1660,8 @@ async function renderEmergency() {
 }
 
 function quickCall(phone) {
-  if (!phone) { toast('No phone number saved'); return; }
+  if (!phone) { haptic('error'); toast('No phone number saved'); return; }
+  haptic('medium');
   location.href = `tel:${phone}`;
 }
 
@@ -2275,6 +2360,7 @@ function renderPinScreen(mode = 'unlock') {
 }
 
 function pinTap(key) {
+  haptic('light');
   if (key === '⌫') {
     pinBuffer = pinBuffer.slice(0, -1);
   } else {
@@ -2295,18 +2381,22 @@ function updatePinDots() {
 function checkPin() {
   if (pinMode === 'unlock') {
     if (pinBuffer === appPin) {
+      haptic('success');
       isUnlocked = true;
       renderHome();
     } else {
+      haptic('error');
       document.getElementById('pinError').textContent = '❌ Wrong PIN';
       pinBuffer = '';
       updatePinDots();
     }
   } else if (pinMode === 'set') {
-    pinTemp = pinBuffer; // save BEFORE calling renderPinScreen
+    haptic('light');
+    pinTemp = pinBuffer;
     renderPinScreen('confirm');
   } else if (pinMode === 'confirm') {
     if (pinBuffer === pinTemp) {
+      haptic('success');
       appPin = pinBuffer;
       localStorage.setItem('coverly_pin', appPin);
       localStorage.setItem('coverly_pin_enabled', '1');
@@ -2316,6 +2406,7 @@ function checkPin() {
       toast('🔐 PIN set successfully');
       renderSettings();
     } else {
+      haptic('error');
       document.getElementById('pinError').textContent = '❌ PINs do not match — try again';
       pinBuffer = '';
       updatePinDots();
@@ -2389,6 +2480,65 @@ async function renderSettings() {
     </div>
   </div>`;
 
+  html += `<div class="section-label">Find Missing Policies</div>
+  <div class="card">
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:12px">
+        You may have insurance policies buried in old emails. Search your inbox yourself using these terms — Coverly never accesses your email.
+      </p>
+      <div id="emailSearchTerms" style="display:flex;flex-direction:column;gap:6px">
+        ${[
+          'policy number',
+          'certificate of insurance',
+          'your policy schedule',
+          'insurance confirmation',
+          'cover starts',
+          'your renewal',
+          'policy documents attached',
+        ].map(term => `
+          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px">
+            <span style="font-family:'DM Mono',monospace;font-size:13px;color:var(--text)">${esc(term)}</span>
+            <button class="btn-icon" style="width:32px;height:32px;font-size:14px" onclick="copySearchTerm('${esc(term)}')" title="Copy">📋</button>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn btn-ghost" onclick="showEmailSearchGuide()" style="margin-top:10px;font-size:13px">📖 How to search my email</button>
+    </div>
+  </div>`;
+
+  html += `<div class="section-label">Renewal Reminders</div>
+  <div class="card">
+    <div class="card-body">
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">🔔 Annual policy check</div>
+          <div class="settings-desc">${localStorage.getItem('coverly_notif_enabled') === '1'
+            ? 'Reminder set — Coverly will nudge you once a year'
+            : 'Get a yearly nudge to check your policies are up to date'
+          }</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${localStorage.getItem('coverly_notif_enabled') === '1' ? 'checked' : ''} onchange="toggleAnnualReminder(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">📅 Expiry alerts</div>
+          <div class="settings-desc">${localStorage.getItem('coverly_expiry_notif') === '1'
+            ? 'On — 30-day warning before policies expire'
+            : 'Get notified 30 days before a policy expires'
+          }</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${localStorage.getItem('coverly_expiry_notif') === '1' ? 'checked' : ''} onchange="toggleExpiryReminders(this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:8px;line-height:1.6">
+        🔒 All reminders are scheduled locally on your device. Nothing is sent to any server.
+      </div>
+    </div>
   html += `<div class="section-label">App</div>
   <div class="card">
     <div class="card-body">
@@ -2416,10 +2566,19 @@ async function renderSettings() {
 
   html += `<div class="section-label">About</div>
   <div class="card">
-    <div class="card-body" style="font-size:13px;color:var(--text-2);line-height:1.6">
-      <b style="color:var(--text)">Coverly v2.0</b><br>
-      Privacy-first insurance vault. Built to work offline and keep your most important details safe.<br><br>
-      <span style="opacity:0.6">MIT License</span>
+    <div class="card-body">
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">Coverly</div>
+          <div class="settings-desc" style="font-family:'DM Mono',monospace">v${APP_VERSION} · SW ${SW_VERSION}</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:12px">
+        Privacy-first insurance vault. Built to work offline and keep your most important details safe.<br>MIT License
+      </div>
+      <button class="btn btn-ghost" onclick="sendFeedback()" style="font-size:13px">💬 Send Feedback</button>
+      <button class="btn btn-ghost" onclick="shareApp()" style="margin-top:6px;font-size:13px">🔗 Share Coverly with someone</button>
+      <button class="btn btn-ghost" onclick="clearCacheAndReload()" style="margin-top:6px;font-size:13px">🔄 Clear cache &amp; reload</button>
     </div>
   </div>`;
 
@@ -2524,6 +2683,10 @@ function renderOnboarding() {
 
   document.getElementById('app').innerHTML = `
     <div class="onboard-screen">
+      ${onboardStep === 0 ? `
+        <div style="text-align:right;padding-bottom:8px">
+          <button onclick="skipOnboarding()" style="background:none;border:none;color:var(--text-3);font-size:13px;cursor:pointer;padding:4px 0">Skip</button>
+        </div>` : ''}
       <div class="onboard-step">
         <div class="onboard-icon">${s.icon}</div>
         <div class="onboard-title">${s.title.replace('\n', '<br>')}</div>
@@ -2544,20 +2707,58 @@ function renderOnboarding() {
   `;
 }
 
+async function skipOnboarding() {
+  haptic('light');
+  localStorage.setItem('coverly_onboarded', '1');
+  const policies = await getPolicies();
+  if (policies.length === 0 && !localStorage.getItem('coverly_demo_asked')) {
+    localStorage.setItem('coverly_demo_asked', '1');
+    showOnboardingDemoOffer();
+  } else {
+    await renderHome();
+  }
+}
+
 async function nextOnboard() {
   if (onboardStep < ONBOARD_STEPS.length - 1) {
     onboardStep++;
     renderOnboarding();
   } else {
     localStorage.setItem('coverly_onboarded', '1');
-    await renderHome();
-    // Offer demo data after onboarding if vault is empty
+    // Check if we should offer demo data before going to home
     const policies = await getPolicies();
     if (policies.length === 0 && !localStorage.getItem('coverly_demo_asked')) {
       localStorage.setItem('coverly_demo_asked', '1');
-      setTimeout(confirmLoadDemo, 1000);
+      // Show demo offer as the natural next step — user is still in a "setup" mindset
+      showOnboardingDemoOffer();
+    } else {
+      await renderHome();
     }
   }
+}
+
+function showOnboardingDemoOffer() {
+  document.getElementById('app').innerHTML = `
+    <div class="onboard-screen page">
+      <div class="onboard-step">
+        <div class="onboard-icon">📋</div>
+        <div class="onboard-title">Load example<br>policies?</div>
+        <div class="onboard-text">We can add 4 realistic example policies so you can explore all the features — emergency mode, overview, backup and more. You can delete them any time.</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600">🚗 Car · 🏠 Home · 🏥 Health · ✈️ Travel</div>
+          <div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600">🗑️ Delete them any time from the vault</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="doLoadDemoThenHome()" style="margin-top:28px">✅ Yes, load examples</button>
+      <button class="btn btn-ghost" onclick="renderHome()" style="margin-top:4px">Skip — start empty</button>
+    </div>
+  `;
+}
+
+async function doLoadDemoThenHome() {
+  await seedDemoData();
+  await renderHome();
+  toast('✅ 4 example policies loaded!');
 }
 
 /* ═══════════════════════════════════════
@@ -2640,6 +2841,34 @@ function promptInstall() {
   } else {
     toast('Open in browser and use "Add to Home Screen"');
   }
+}
+
+function sendFeedback() {
+  const subject = encodeURIComponent(`Coverly ${APP_VERSION} Feedback`);
+  const body = encodeURIComponent(`App version: ${APP_VERSION} (SW ${SW_VERSION})\nDevice: ${navigator.userAgent}\n\n--- Your feedback below ---\n\n`);
+  window.open(`mailto:?subject=${subject}&body=${body}`);
+}
+
+function shareApp() {
+  const text = 'Check out Coverly — a private, offline insurance vault. No accounts, no cloud, no tracking.';
+  const url  = location.origin + location.pathname;
+  if (navigator.share) {
+    navigator.share({ title: 'Coverly', text, url }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(url).then(() => toast('🔗 Link copied!'));
+  }
+}
+
+async function clearCacheAndReload() {
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  }
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+  }
+  location.reload(true);
 }
 
 /* ═══════════════════════════════════════
@@ -2953,6 +3182,149 @@ function dismissBackupBanner() {
     setTimeout(() => b.remove(), 200);
   }
 }
+
+/* ═══════════════════════════════════════
+   EMAIL SEARCH HELPER
+═══════════════════════════════════════ */
+function copySearchTerm(term) {
+  navigator.clipboard?.writeText(term).then(() => toast(`📋 Copied: "${term}"`));
+}
+
+function showEmailSearchGuide() {
+  showSheet(`
+    <div class="sheet-title">📧 Finding policies in email</div>
+    <div class="sheet-sub">Coverly never accesses your email. Here's how to search it yourself:</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div class="card" style="margin:0">
+        <div class="card-body" style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:22px;flex-shrink:0">📱</span>
+          <div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:3px">Gmail (Android)</div>
+            <div style="font-size:13px;color:var(--text-2);line-height:1.5">Tap the search bar → paste a term → look for emails with PDF attachments.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-body" style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:22px;flex-shrink:0">🍎</span>
+          <div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:3px">Apple Mail / iCloud</div>
+            <div style="font-size:13px;color:var(--text-2);line-height:1.5">Pull down on inbox to reveal search → type term → filter by Has Attachment.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="card-body" style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:22px;flex-shrink:0">💼</span>
+          <div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:3px">Outlook</div>
+            <div style="font-size:13px;color:var(--text-2);line-height:1.5">Search bar at top → type term → Filters → Has Attachments.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--blue-dim);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px">
+      💡 When you find an insurance email, open the PDF attachment then share it to Coverly using <b style="color:var(--text)">Add → Upload PDF</b> to scan it automatically.
+    </div>
+    <button class="btn btn-primary" onclick="closeSheet()">Got it</button>
+  `);
+}
+
+/* ═══════════════════════════════════════
+   NOTIFICATIONS
+═══════════════════════════════════════ */
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    toast('⚠️ Notifications not supported in this browser');
+    return false;
+  }
+  if (Notification.permission === 'granted') return true;
+  const result = await Notification.requestPermission();
+  return result === 'granted';
+}
+
+async function toggleAnnualReminder(enabled) {
+  if (enabled) {
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      toast('⚠️ Permission denied — enable notifications in browser settings');
+      renderSettings(); return;
+    }
+    localStorage.setItem('coverly_notif_enabled', '1');
+    // Schedule 1 year from now
+    localStorage.setItem('coverly_next_annual', (Date.now() + 365 * 86400000).toString());
+    toast('🔔 Annual reminder set');
+  } else {
+    localStorage.removeItem('coverly_notif_enabled');
+    localStorage.removeItem('coverly_next_annual');
+    toast('Reminder removed');
+  }
+  renderSettings();
+}
+
+async function toggleExpiryReminders(enabled) {
+  if (enabled) {
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      toast('⚠️ Permission denied — enable notifications in browser settings');
+      renderSettings(); return;
+    }
+    localStorage.setItem('coverly_expiry_notif', '1');
+    toast('🔔 Expiry alerts enabled');
+  } else {
+    localStorage.removeItem('coverly_expiry_notif');
+    // Clear all previously fired notification markers so they re-fire if re-enabled
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('coverly_notif_fired_'))
+      .forEach(k => localStorage.removeItem(k));
+    toast('Expiry alerts removed');
+  }
+  renderSettings();
+}
+
+// ── Check on every app open — no server needed, all on-device ──
+async function checkDueNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const now = Date.now();
+
+  // Annual policy check
+  if (localStorage.getItem('coverly_notif_enabled') === '1') {
+    const nextAnnual = parseInt(localStorage.getItem('coverly_next_annual') || '0', 10);
+    if (nextAnnual && now >= nextAnnual) {
+      new Notification('Coverly — Time for your annual policy check', {
+        body: 'Do you have any new, changed or expired policies to update in your vault?',
+        icon: 'icon-192-coverly.png',
+        tag: 'annual-reminder',
+        silent: false,
+      });
+      // Reschedule for next year
+      localStorage.setItem('coverly_next_annual', (now + 365 * 86400000).toString());
+    }
+  }
+
+  // Expiry alerts — 30, 14, 7 days before each policy expires
+  if (localStorage.getItem('coverly_expiry_notif') === '1') {
+    const policies = await getPolicies();
+    for (const p of policies) {
+      if (!p.expiry) continue;
+      const days = Math.ceil((new Date(p.expiry) - new Date()) / 86400000);
+      for (const threshold of [30, 14, 7]) {
+        if (days > threshold || days < 0) continue;
+        const firedKey = `coverly_notif_fired_${p.id}_${threshold}`;
+        if (!localStorage.getItem(firedKey)) {
+          const meta = getPolicyMeta(p.type);
+          new Notification(`${meta.icon} Policy expiring in ${days} day${days === 1 ? '' : 's'}`, {
+            body: `${p.insurer || meta.label} — ${p.number} expires on ${formatDate(p.expiry)}`,
+            icon: 'icon-192-coverly.png',
+            tag: `expiry-${p.id}-${threshold}`,
+          });
+          localStorage.setItem(firedKey, '1');
+        }
+      }
+    }
+  }
+}
+
 async function boot() {
   await initDB();
   getLocation();
@@ -2984,23 +3356,33 @@ async function boot() {
     return;
   }
 
-  // Seed demo data once if vault is empty — show prompt after user has settled on home screen
+  // Seed demo data once if vault is empty
   const policies = await getPolicies();
   if (policies.length === 0 && !localStorage.getItem('coverly_demo_asked')) {
     localStorage.setItem('coverly_demo_asked', '1');
-    await renderHome();
-    // Give user time to see home screen before the sheet appears
-    setTimeout(confirmLoadDemo, 1800);
+    // Show as a proper screen, not a timed popup
+    showOnboardingDemoOffer();
     return;
   }
 
   await renderHome();
-  // Show backup banner after a short delay so home renders first
   setTimeout(maybeShowBackupPrompt, 1200);
+  checkDueNotifications(); // on-device check, no server needed
 }
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    // Force the SW to check for updates immediately on every page load
+    reg.update();
+
+    // When a new SW takes over (skipWaiting fired), reload so the new index.html is used
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // Only reload if we're not in the middle of user input
+      if (!document.querySelector('input:focus, textarea:focus')) {
+        window.location.reload();
+      }
+    });
+  }).catch(() => {});
 }
 
 boot();
