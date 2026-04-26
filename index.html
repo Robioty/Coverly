@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Coverly">
-<meta name="coverly-version" content="1.0.0-beta-sw11">
+<meta name="coverly-version" content="1.1.0-beta-sw11">
 <title>Coverly</title>
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -619,8 +619,124 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .onboard-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--text-3); transition: width 0.2s, background 0.2s; }
 .onboard-dot.active { width: 20px; background: var(--text); }
 
-/* ── Responsive ── */
-@media(min-width:600px){
+/* ── Document Attachments ── */
+.doc-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.doc-scroll::-webkit-scrollbar { display: none; }
+.doc-thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.doc-thumb:active { border-color: var(--border-focus); }
+.doc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.doc-thumb-pdf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+  font-size: 10px;
+  color: var(--text-2);
+  font-weight: 600;
+  text-align: center;
+  padding: 4px;
+  word-break: break-all;
+}
+.doc-thumb-pdf span { font-size: 28px; line-height: 1; }
+.doc-thumb-del {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 11px;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+  z-index: 1;
+}
+.doc-add-btn {
+  flex-shrink: 0;
+  width: 80px; height: 80px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--border);
+  background: none;
+  color: var(--text-3);
+  font-size: 28px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.doc-add-btn:active { border-color: var(--border-focus); color: var(--text); }
+
+/* ── Doc Viewer ── */
+.doc-viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+}
+.doc-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  flex-shrink: 0;
+}
+.doc-viewer-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0 12px;
+}
+.doc-viewer-body {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8px 0;
+}
+.doc-viewer-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.doc-viewer-body canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
   .container { padding: 20px 24px; }
 }
 
@@ -658,6 +774,29 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 }
 .backup-banner-btn.primary { background: var(--blue); color: #fff; }
 .backup-banner-btn.ghost { background: rgba(255,255,255,0.08); color: var(--text-2); }
+
+/* ── Pull-to-refresh ── */
+.ptr-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-3);
+  transition: height 0.15s, opacity 0.15s;
+  opacity: 0;
+}
+.ptr-indicator.visible { opacity: 1; }
+.ptr-spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text-2);
+  border-radius: 50%;
+  animation: ptrSpin 0.7s linear infinite;
+}
+@keyframes ptrSpin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -668,6 +807,7 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 <input type="file" id="fileInput" accept="image/*,application/pdf" style="display:none">
 <input type="file" id="fileInputCamera" accept="image/*" capture="environment" style="display:none">
 <input type="file" id="restoreInput" accept=".coverly,.json" style="display:none">
+<input type="file" id="docAttachInput" accept="image/*,application/pdf" style="display:none">
 
 <script>
 'use strict';
@@ -675,7 +815,7 @@ button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
 /* ═══════════════════════════════════════
    VERSION
 ═══════════════════════════════════════ */
-const APP_VERSION = '1.0.0-beta';
+const APP_VERSION = '1.1.0-beta';
 const SW_VERSION  = 'v11';
 
 /* ═══════════════════════════════════════
@@ -728,17 +868,22 @@ let isUnlocked = !pinEnabled;
 let scanAnimId = null;
 let pendingOCRData = null;
 let editingPolicyId = null;
+let pendingAttachments = []; // { name, type, data (blob/arrayBuffer) } — flushed on savePolicy
 
 /* ═══════════════════════════════════════
    DATABASE
 ═══════════════════════════════════════ */
 function initDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('coverlyDB', 2);
+    const req = indexedDB.open('coverlyDB', 3);
     req.onupgradeneeded = e => {
       const d = e.target.result;
       if (!d.objectStoreNames.contains('policies')) {
         d.createObjectStore('policies', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!d.objectStoreNames.contains('documents')) {
+        const docStore = d.createObjectStore('documents', { keyPath: 'id', autoIncrement: true });
+        docStore.createIndex('policyId', 'policyId', { unique: false });
       }
     };
     req.onsuccess = e => { db = e.target.result; resolve(); };
@@ -773,6 +918,54 @@ function deletePolicy(id) {
   return new Promise(res => {
     store('readwrite').delete(id);
     res();
+  });
+}
+
+/* ── Document store helpers ── */
+const docStore = (mode = 'readonly') => db.transaction('documents', mode).objectStore('documents');
+
+function getDocumentsForPolicy(policyId) {
+  return new Promise(res => {
+    const idx = docStore().index('policyId');
+    const r = idx.getAll(policyId);
+    r.onsuccess = () => res(r.result);
+  });
+}
+
+function addDocument(doc) {
+  return new Promise(res => {
+    const r = docStore('readwrite').add({ ...doc, addedAt: Date.now() });
+    r.onsuccess = () => res(r.result);
+  });
+}
+
+function deleteDocument(id) {
+  return new Promise(res => {
+    docStore('readwrite').delete(id);
+    res();
+  });
+}
+
+function deleteDocumentsForPolicy(policyId) {
+  return new Promise(res => {
+    const idx = docStore('readwrite').index('policyId');
+    const r = idx.getAll(policyId);
+    r.onsuccess = () => {
+      const docs = r.result;
+      if (docs.length === 0) { res(); return; }
+      let done = 0;
+      docs.forEach(d => {
+        const del = docStore('readwrite').delete(d.id);
+        del.onsuccess = () => { if (++done === docs.length) res(); };
+      });
+    };
+  });
+}
+
+function getAllDocuments() {
+  return new Promise(res => {
+    const r = docStore().getAll();
+    r.onsuccess = () => res(r.result);
   });
 }
 
@@ -1095,7 +1288,51 @@ async function renderHome() {
   }
 
   html += `</div>` + navHTML('home');
+  // PTR indicator sits at the very top of #app, above the container
+  html = `<div id="ptrIndicator" class="ptr-indicator"><div class="ptr-spinner"></div><span>Refreshing…</span></div>` + html;
   document.getElementById('app').innerHTML = html;
+  initPullToRefresh();
+}
+
+function initPullToRefresh() {
+  const app = document.getElementById('app');
+  if (!app) return;
+  let startY = 0, pulling = false, triggered = false;
+  const THRESHOLD = 72;
+
+  app.addEventListener('touchstart', e => {
+    // Only activate when scrolled to top
+    if (window.scrollY > 4) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+    triggered = false;
+  }, { passive: true });
+
+  app.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy < 10) return;
+    const indicator = document.getElementById('ptrIndicator');
+    if (!indicator) return;
+    const h = Math.min(dy * 0.45, 56);
+    indicator.style.height = h + 'px';
+    indicator.classList.toggle('visible', h > 20);
+    if (h >= THRESHOLD * 0.45 && !triggered) triggered = true;
+  }, { passive: true });
+
+  app.addEventListener('touchend', async () => {
+    if (!pulling) return;
+    pulling = false;
+    const indicator = document.getElementById('ptrIndicator');
+    if (indicator) {
+      indicator.style.height = '0';
+      indicator.classList.remove('visible');
+    }
+    if (triggered) {
+      haptic('light');
+      await renderHome();
+    }
+  }, { passive: true });
 }
 
 function getTimeOfDay() {
@@ -1123,6 +1360,7 @@ async function renderDashboard() {
   const expiring90 = withExpiry.filter(p => { const d = daysUntil(p.expiry); return d > 30 && d <= 90; });
   const active = withExpiry.filter(p => daysUntil(p.expiry) > 90);
   const noExpiry = policies.filter(p => !p.expiry);
+  const totalPremium = policies.reduce((sum, p) => sum + (parseFloat(p.premium) || 0), 0);
 
   // ── Donut data ──
   const donutData = [
@@ -1144,7 +1382,12 @@ async function renderDashboard() {
 
   // ── Stats row ──
   if (policies.length === 0) {
-    html += `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No data yet</div><div class="empty-text">Add policies to see your coverage overview and renewal calendar.</div></div>`;
+    html += `<div class="empty">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">No policies yet</div>
+      <div class="empty-text">Add your first policy to see your coverage overview, renewal calendar and cost breakdown.</div>
+      <button class="btn btn-primary" onclick="showAddSheet()" style="margin-top:16px">＋ Add First Policy</button>
+    </div>`;
     html += `</div>` + navHTML('dashboard');
     document.getElementById('app').innerHTML = html;
     return;
@@ -1173,6 +1416,12 @@ async function renderDashboard() {
       <div class="stat-value">${noExpiry.length}</div>
       <div class="stat-label">No expiry set</div>
     </div>` : ''}
+    ${totalPremium > 0 ? `
+    <div class="stat-card full" style="background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.2)">
+      <div class="stat-icon">💷</div>
+      <div class="stat-value" style="color:var(--purple)">£${totalPremium.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+      <div class="stat-label">Total Annual Premiums</div>
+    </div>` : ''}
   </div>`;
 
   // ── Coverage overview ──
@@ -1199,7 +1448,7 @@ async function renderDashboard() {
       <div class="coverage-icon">${meta.icon}</div>
       <div class="coverage-info">
         <div class="coverage-name">${esc(p.insurer || meta.label)}</div>
-        <div class="coverage-sub">${esc(p.number)}</div>
+        <div class="coverage-sub">${esc(p.number)}${p.premium ? ` · £${Number(p.premium).toFixed(0)}/yr` : ''}</div>
       </div>
       <div class="coverage-status">
         <span class="badge" style="background:none;color:${statusDot};border:1.5px solid ${statusDot};padding:3px 8px">${statusText}</span>
@@ -1220,7 +1469,16 @@ async function renderDashboard() {
   // ── Timeline ──
   html += `<div class="section-label">Timeline</div>`;
   if (events.length === 0) {
-    html += `<div style="font-size:14px;color:var(--text-2);padding:12px 0">No upcoming events — add expiry dates to policies to see them here.</div>`;
+    // Check if there are policies but none have expiry dates
+    const noExpiryCount = policies.filter(p => !p.expiry).length;
+    if (noExpiryCount > 0) {
+      html += `<div style="background:var(--amber-dim);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius);padding:16px;margin:8px 0;font-size:13px;line-height:1.6">
+        <b style="color:var(--amber)">⚠️ ${noExpiryCount} polic${noExpiryCount === 1 ? 'y has' : 'ies have'} no expiry date set.</b>
+        <span style="color:var(--text-2)"> Tap a policy and use Edit to add expiry dates — they'll appear here as renewal reminders.</span>
+      </div>`;
+    } else {
+      html += `<div style="font-size:14px;color:var(--text-2);padding:12px 0">No upcoming events.</div>`;
+    }
   } else {
     html += buildTimeline(events);
   }
@@ -1433,6 +1691,16 @@ async function renderPolicyDetail(id) {
   const p = policies.find(x => x.id === id);
   if (!p) return;
   const meta = getPolicyMeta(p.type);
+  const docs = await getDocumentsForPolicy(id);
+
+  // Build preview URLs for images
+  const docsWithPreviews = await Promise.all(docs.map(async doc => {
+    const isPDF = doc.type === 'application/pdf' || (doc.name || '').toLowerCase().endsWith('.pdf');
+    if (!isPDF && doc.data) {
+      doc.previewUrl = URL.createObjectURL(new Blob([doc.data], { type: doc.type }));
+    }
+    return doc;
+  }));
 
   let html = headerHTML(`${meta.icon} ${meta.label}`) + `<div class="container page">`;
 
@@ -1447,8 +1715,17 @@ async function renderPolicyDetail(id) {
       ${p.expiry ? `<div class="section-label">Expiry Date</div><div style="font-size:15px">${formatDate(p.expiry)}</div>` : ''}
       ${p.emergencyContact ? `<div class="section-label">Emergency Contact</div><div style="font-size:15px">${esc(p.emergencyContact)}</div>` : ''}
       ${p.notes ? `<div class="section-label">Notes</div><div style="font-size:14px;color:var(--text-2);line-height:1.5">${esc(p.notes)}</div>` : ''}
+      ${p.premium ? `<div class="section-label">Annual Premium</div><div style="font-size:18px;font-weight:700;color:var(--green)">£${Number(p.premium).toFixed(2)}</div>` : ''}
     </div>
   </div>`;
+
+  // ── Documents section ──
+  if (docsWithPreviews.length > 0) {
+    html += `<div class="section-label">Documents <span style="color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">(${docsWithPreviews.length})</span></div>
+    <div class="doc-scroll" id="detailDocScroll">
+      ${buildDocThumbs(docsWithPreviews, 'view')}
+    </div>`;
+  }
 
   html += `<div class="section-label">Quick Actions</div>
   <div class="action-row">
@@ -1469,6 +1746,14 @@ async function renderPolicyDetail(id) {
 
   html += `</div>`;
   document.getElementById('app').innerHTML = html;
+
+  // Stamp image srcs for saved docs (can't embed object URLs in innerHTML safely)
+  docsWithPreviews.forEach(doc => {
+    if (doc.previewUrl) {
+      const thumb = document.querySelector(`.doc-thumb[onclick="openSavedDocViewer(${doc.id})"] img`);
+      if (thumb) thumb.src = doc.previewUrl;
+    }
+  });
 }
 
 async function copyPolicyText(id) {
@@ -1502,6 +1787,7 @@ function confirmDelete(id) {
 
 async function doDelete(id) {
   await deletePolicy(id);
+  await deleteDocumentsForPolicy(id);
   closeSheet();
   toast('Policy deleted');
   activeTab = 'home';
@@ -1513,6 +1799,9 @@ async function doDelete(id) {
 ═══════════════════════════════════════ */
 function renderAdd(prefill = {}) {
   editingPolicyId = null;
+  pendingAttachments = [];
+  pendingThumbUrls.forEach(u => { if (u) URL.revokeObjectURL(u); });
+  pendingThumbUrls = [];
   activeTab = 'add';
   const typeOptions = POLICY_TYPES.map(t =>
     `<option value="${t.key}" ${prefill.type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`
@@ -1545,14 +1834,20 @@ function renderAdd(prefill = {}) {
       <input id="f_emergency" placeholder="Name or number for emergencies" value="${esc(prefill.emergencyContact || '')}">
     </div>
     <div class="field">
+      <label>Annual Premium (optional)</label>
+      <input id="f_premium" type="number" inputmode="decimal" placeholder="e.g. 450.00" min="0" step="0.01" value="${esc(prefill.premium || '')}">
+    </div>
+    <div class="field">
       <label>Notes (optional)</label>
       <textarea id="f_notes" placeholder="Excess amount, coverage details...">${esc(prefill.notes || '')}</textarea>
     </div>
+    <div id="attachSection"></div>
     <button class="btn btn-primary" onclick="savePolicy()">💾 Save Policy</button>
     <button class="btn btn-ghost" onclick="startOCR()" style="margin-top:4px">📷 Scan Document Instead</button>
   `;
   html += `</div>` + navHTML('add');
   document.getElementById('app').innerHTML = html;
+  refreshAttachSection();
 }
 
 async function renderEditPolicy(id) {
@@ -1560,6 +1855,9 @@ async function renderEditPolicy(id) {
   const p = policies.find(x => x.id === id);
   if (!p) return;
   editingPolicyId = id;
+  pendingAttachments = [];
+  pendingThumbUrls.forEach(u => { if (u) URL.revokeObjectURL(u); });
+  pendingThumbUrls = [];
 
   const typeOptions = POLICY_TYPES.map(t =>
     `<option value="${t.key}" ${p.type === t.key ? 'selected' : ''}>${t.icon} ${t.label}</option>`
@@ -1573,11 +1871,14 @@ async function renderEditPolicy(id) {
     <div class="field"><label>Claims / Contact Phone</label><input id="f_phone" type="tel" value="${esc(p.phone || '')}"></div>
     <div class="field"><label>Expiry Date</label><input id="f_expiry" type="date" value="${esc(p.expiry || '')}"></div>
     <div class="field"><label>Emergency Contact</label><input id="f_emergency" value="${esc(p.emergencyContact || '')}"></div>
+    <div class="field"><label>Annual Premium (optional)</label><input id="f_premium" type="number" inputmode="decimal" placeholder="e.g. 450.00" min="0" step="0.01" value="${esc(p.premium || '')}"></div>
     <div class="field"><label>Notes</label><textarea id="f_notes">${esc(p.notes || '')}</textarea></div>
+    <div id="attachSection"><div style="font-size:12px;color:var(--text-3);padding:8px 0">Loading documents…</div></div>
     <button class="btn btn-primary" onclick="savePolicy()">💾 Update Policy</button>
   `;
   html += `</div>`;
   document.getElementById('app').innerHTML = html;
+  buildAttachSectionForEdit(id);
 }
 
 async function savePolicy() {
@@ -1588,6 +1889,7 @@ async function savePolicy() {
     phone: document.getElementById('f_phone').value.trim(),
     expiry: document.getElementById('f_expiry').value,
     emergencyContact: document.getElementById('f_emergency').value.trim(),
+    premium: parseFloat(document.getElementById('f_premium')?.value) || null,
     notes: document.getElementById('f_notes').value.trim(),
   };
 
@@ -1597,10 +1899,12 @@ async function savePolicy() {
     const policies = await getPolicies();
     const existing = policies.find(x => x.id === editingPolicyId);
     await updatePolicy({ ...existing, ...data });
+    await flushPendingAttachments(editingPolicyId);
     haptic('success');
     toast('✅ Policy updated');
   } else {
-    await addPolicy(data);
+    const newId = await addPolicy(data);
+    await flushPendingAttachments(newId);
     haptic('success');
     toast('✅ Policy saved');
   }
@@ -1688,39 +1992,371 @@ function quickWA(type, number) {
 }
 
 /* ═══════════════════════════════════════
+   DOCUMENT ATTACHMENTS
+═══════════════════════════════════════ */
+
+// ── Build thumbnail HTML for a list of doc objects (saved or pending) ──
+// mode: 'edit' shows delete buttons, 'view' shows tap-to-open only
+function buildDocThumbs(docs, mode = 'view', pendingOffset = 0) {
+  if (!docs || docs.length === 0) return '';
+  return docs.map((doc, i) => {
+    const idx = mode === 'pending' ? pendingOffset + i : i;
+    const isPDF = doc.type === 'application/pdf' || (doc.name || '').toLowerCase().endsWith('.pdf');
+    const delBtn = (mode === 'edit' || mode === 'pending')
+      ? `<button class="doc-thumb-del" onclick="event.stopPropagation();${mode === 'pending' ? `removePendingAttachment(${i})` : `deleteSavedDoc(${doc.id})`}" title="Remove">✕</button>`
+      : '';
+    const clickHandler = mode === 'pending'
+      ? `openPendingDocViewer(${i})`
+      : `openSavedDocViewer(${doc.id})`;
+    if (isPDF) {
+      const shortName = (doc.name || 'document.pdf').length > 12
+        ? (doc.name || 'document.pdf').slice(0, 10) + '…'
+        : (doc.name || 'document.pdf');
+      return `<div class="doc-thumb" onclick="${clickHandler}">
+        ${delBtn}
+        <div class="doc-thumb-pdf"><span>📄</span>${esc(shortName)}</div>
+      </div>`;
+    } else {
+      // For saved docs, we use a data URL stored at doc.previewUrl (set when rendering)
+      // For pending, we use pendingThumbUrls[i]
+      const imgSrc = mode === 'pending'
+        ? `id="pendingThumb_${i}"`
+        : `src="${esc(doc.previewUrl || '')}"`;
+      return `<div class="doc-thumb" onclick="${clickHandler}">
+        ${delBtn}
+        <img ${imgSrc} alt="${esc(doc.name || 'image')}" style="width:100%;height:100%;object-fit:cover">
+      </div>`;
+    }
+  }).join('');
+}
+
+// Pending attachment thumb URLs (object URLs, revoked on save/cancel)
+let pendingThumbUrls = [];
+
+function removePendingAttachment(i) {
+  if (pendingThumbUrls[i]) URL.revokeObjectURL(pendingThumbUrls[i]);
+  pendingAttachments.splice(i, 1);
+  pendingThumbUrls.splice(i, 1);
+  refreshAttachSection();
+}
+
+function refreshAttachSection() {
+  const section = document.getElementById('attachSection');
+  if (!section) return;
+  section.innerHTML = buildAttachSectionInner();
+  // Re-stamp thumb img srcs for pending images
+  pendingAttachments.forEach((doc, i) => {
+    const isPDF = doc.type === 'application/pdf' || (doc.name || '').toLowerCase().endsWith('.pdf');
+    if (!isPDF) {
+      const el = document.getElementById(`pendingThumb_${i}`);
+      if (el) el.src = pendingThumbUrls[i] || '';
+    }
+  });
+}
+
+function buildAttachSectionInner() {
+  const hasPending = pendingAttachments.length > 0;
+  return `
+    <div class="section-label" style="margin-top:14px">Documents</div>
+    <div class="doc-scroll" id="docScrollRow">
+      ${buildDocThumbs(pendingAttachments, 'pending')}
+      <button class="doc-add-btn" onclick="triggerDocAttach()" title="Attach document">＋</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;line-height:1.5">
+      Attach photos or PDFs of this policy (stored privately on your device).${hasPending ? ` <b style="color:var(--text-2)">${pendingAttachments.length} pending</b> — will save with policy.` : ''}
+    </div>
+  `;
+}
+
+// Called when editing an existing policy — loads saved docs and shows them
+async function buildAttachSectionForEdit(policyId) {
+  const saved = await getDocumentsForPolicy(policyId);
+  // Build preview URLs for images
+  const withPreviews = await Promise.all(saved.map(async doc => {
+    const isPDF = doc.type === 'application/pdf';
+    if (!isPDF && doc.data) {
+      doc.previewUrl = URL.createObjectURL(new Blob([doc.data], { type: doc.type }));
+    }
+    return doc;
+  }));
+
+  const section = document.getElementById('attachSection');
+  if (!section) return;
+  section.innerHTML = `
+    <div class="section-label" style="margin-top:14px">Documents</div>
+    <div class="doc-scroll" id="docScrollRow">
+      ${buildDocThumbs(withPreviews, 'edit')}
+      ${buildDocThumbs(pendingAttachments, 'pending', withPreviews.length)}
+      <button class="doc-add-btn" onclick="triggerDocAttach()" title="Attach document">＋</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;line-height:1.5">
+      Tap a document to view it. Tap ✕ to remove.${pendingAttachments.length > 0 ? ` <b style="color:var(--text-2)">${pendingAttachments.length} new</b> — will save with policy.` : ''}
+    </div>
+  `;
+  // Stamp image srcs for pending
+  pendingAttachments.forEach((doc, i) => {
+    const isPDF = doc.type === 'application/pdf';
+    if (!isPDF) {
+      const el = document.getElementById(`pendingThumb_${withPreviews.length + i}`);
+      if (el) el.src = pendingThumbUrls[i] || '';
+    }
+  });
+}
+
+async function deleteSavedDoc(docId) {
+  await deleteDocument(docId);
+  // Refresh the attach section (need policyId — read from editingPolicyId)
+  if (editingPolicyId) buildAttachSectionForEdit(editingPolicyId);
+  toast('Document removed');
+}
+
+function triggerDocAttach() {
+  document.getElementById('docAttachInput').click();
+}
+
+document.getElementById('docAttachInput').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+
+  const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+  if (file.size > MAX_SIZE) {
+    toast('⚠️ File too large — max 20 MB');
+    return;
+  }
+
+  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const buf = await file.arrayBuffer();
+  pendingAttachments.push({ name: file.name, type: file.type || (isPDF ? 'application/pdf' : 'image/jpeg'), data: buf });
+
+  if (!isPDF) {
+    pendingThumbUrls.push(URL.createObjectURL(file));
+  } else {
+    pendingThumbUrls.push(null);
+  }
+
+  // Refresh section (edit vs new context)
+  if (editingPolicyId) {
+    buildAttachSectionForEdit(editingPolicyId);
+  } else {
+    refreshAttachSection();
+  }
+});
+
+// ── Save pending attachments to DB after policy is saved ──
+async function flushPendingAttachments(policyId) {
+  for (const doc of pendingAttachments) {
+    await addDocument({ policyId, name: doc.name, type: doc.type, data: doc.data });
+  }
+  // Revoke any object URLs
+  pendingThumbUrls.forEach(u => { if (u) URL.revokeObjectURL(u); });
+  pendingAttachments = [];
+  pendingThumbUrls = [];
+}
+
+// ── Viewers ──
+async function openSavedDocViewer(docId) {
+  const docs = await getAllDocuments();
+  const doc = docs.find(d => d.id === docId);
+  if (!doc) return;
+  const isPDF = doc.type === 'application/pdf' || (doc.name || '').toLowerCase().endsWith('.pdf');
+  const blob = new Blob([doc.data], { type: doc.type });
+  openDocViewer(doc.name, isPDF, blob);
+}
+
+function openPendingDocViewer(i) {
+  const doc = pendingAttachments[i];
+  if (!doc) return;
+  const isPDF = doc.type === 'application/pdf' || (doc.name || '').toLowerCase().endsWith('.pdf');
+  const blob = new Blob([doc.data], { type: doc.type });
+  openDocViewer(doc.name, isPDF, blob);
+}
+
+function openDocViewer(name, isPDF, blob) {
+  // Remove any existing viewer
+  document.getElementById('docViewer')?.remove();
+
+  const viewer = document.createElement('div');
+  viewer.className = 'doc-viewer-backdrop';
+  viewer.id = 'docViewer';
+
+  viewer.innerHTML = `
+    <div class="doc-viewer-header">
+      <button class="btn-icon" onclick="closeDocViewer()">✕</button>
+      <div class="doc-viewer-title">${esc(name || 'Document')}</div>
+      <button class="btn-icon" onclick="downloadDocBlob()" title="Download">⬇️</button>
+    </div>
+    <div class="doc-viewer-body" id="docViewerBody">
+      <div style="color:#94a3b8;font-size:14px;padding:40px">Loading…</div>
+    </div>
+  `;
+  document.body.appendChild(viewer);
+
+  // Store blob for download
+  viewer._blob = blob;
+  viewer._name = name;
+
+  const body = document.getElementById('docViewerBody');
+
+  if (isPDF) {
+    // Render PDF pages using PDF.js
+    const url = URL.createObjectURL(blob);
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+    const container = document.createElement('div');
+    container.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px;padding:0 8px 16px;';
+    body.innerHTML = '';
+    body.appendChild(container);
+
+    pdfjsLib.getDocument({ url }).promise.then(async pdf => {
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: window.devicePixelRatio || 2 });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.cssText = `width:100%;height:auto;border-radius:4px;background:#fff;display:block;`;
+        container.appendChild(canvas);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+      }
+      URL.revokeObjectURL(url);
+    }).catch(() => {
+      body.innerHTML = '<div style="color:#ef4444;font-size:14px;padding:40px">Could not render PDF</div>';
+      URL.revokeObjectURL(url);
+    });
+  } else {
+    // Image
+    const url = URL.createObjectURL(blob);
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'max-width:100%;height:auto;border-radius:4px;';
+    img.onload = () => URL.revokeObjectURL(url);
+    body.innerHTML = '';
+    body.appendChild(img);
+  }
+}
+
+function closeDocViewer() {
+  document.getElementById('docViewer')?.remove();
+}
+
+function downloadDocBlob() {
+  const viewer = document.getElementById('docViewer');
+  if (!viewer || !viewer._blob) return;
+  const url = URL.createObjectURL(viewer._blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = viewer._name || 'document';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ═══════════════════════════════════════
    QR EXPORT
 ═══════════════════════════════════════ */
+// Multi-QR state
+let qrChunks = [];
+let qrChunkIndex = 0;
+
 async function exportQR() {
   const policies = await getPolicies();
   if (!policies.length) { toast('No policies to export'); return; }
 
-  const canvas = document.getElementById('qrCanvas');
-  const data = JSON.stringify({ coverly: true, v: 2, policies });
+  // Strip document blobs — QR is for policy metadata only
+  const policiesStripped = policies.map(({ id, ...rest }) => rest);
+  const fullData = JSON.stringify({ coverly: true, v: 2, policies: policiesStripped });
 
-  try {
-    await QRCode.toCanvas(canvas, data, { width: 240, margin: 2, color: { dark: '#000', light: '#fff' } });
-    canvas.style.display = 'block';
-  } catch(e) {
-    toast('Data too large for QR. Export fewer policies at once.');
-    return;
+  // Try single QR first
+  const MAX_CHUNK = 1200; // conservative QR payload limit in bytes
+  if (fullData.length <= MAX_CHUNK) {
+    qrChunks = [fullData];
+  } else {
+    // Split into chunks with envelope: { cov_chunk: true, i: index, t: total, d: data }
+    const chunkSize = MAX_CHUNK - 60; // leave room for envelope overhead
+    const raw = JSON.stringify({ coverly: true, v: 2, policies: policiesStripped });
+    qrChunks = [];
+    for (let pos = 0; pos < raw.length; pos += chunkSize) {
+      qrChunks.push(raw.slice(pos, pos + chunkSize));
+    }
+    // Re-wrap each chunk
+    qrChunks = qrChunks.map((d, i) =>
+      JSON.stringify({ cov_chunk: true, i, t: qrChunks.length, d })
+    );
   }
 
-  let html = headerHTML('QR Export') + `<div class="container page" style="text-align:center">
-    <p style="color:var(--text-2);font-size:14px;margin-bottom:20px">Scan this on another device with Coverly to import your policies</p>
-    <div style="display:flex;justify-content:center;margin:16px 0"></div>
-    <div class="card" style="text-align:left;margin-top:16px">
-      <div class="card-body">
-        <div class="policy-type">📦 Export contains</div>
-        <div style="font-size:15px;font-weight:600">${policies.length} polic${policies.length === 1 ? 'y' : 'ies'}</div>
-        <div style="font-size:12px;color:var(--text-2);margin-top:4px">⚠️ Keep this QR code private — it contains your policy data</div>
+  qrChunkIndex = 0;
+  renderQRExportScreen(policies.length);
+}
+
+function renderQRExportScreen(policyCount) {
+  const isMulti = qrChunks.length > 1;
+  const current = qrChunkIndex + 1;
+  const total = qrChunks.length;
+
+  let html = headerHTML('QR Export') + `<div class="container page" style="text-align:center">`;
+
+  if (isMulti) {
+    html += `<div style="background:var(--blue-dim);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-2);text-align:left;line-height:1.6">
+      <b style="color:var(--text)">📦 ${policyCount} polic${policyCount === 1 ? 'y' : 'ies'} — split across ${total} QR codes</b><br>
+      Scan them in order on the receiving device. The receiving device will prompt you to scan the next one automatically.
+    </div>`;
+    html += `<div style="font-size:13px;font-weight:700;color:var(--text-2);margin-bottom:12px">QR Code ${current} of ${total}</div>`;
+  } else {
+    html += `<p style="color:var(--text-2);font-size:14px;margin-bottom:16px">Scan this on another device with Coverly to import your policies</p>`;
+  }
+
+  html += `<div id="qrCanvasHolder" style="display:flex;justify-content:center;margin:0 0 16px"></div>`;
+
+  if (isMulti) {
+    html += `<div style="display:flex;gap:10px;justify-content:center;margin-bottom:16px">
+      <button class="btn btn-ghost btn-sm" onclick="qrChunkNav(-1)" ${qrChunkIndex === 0 ? 'disabled style="opacity:0.35"' : ''}>‹ Prev</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${qrChunks.map((_, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === qrChunkIndex ? 'var(--blue)' : 'var(--border)'}"></div>`).join('')}
       </div>
+      <button class="btn btn-blue btn-sm" onclick="qrChunkNav(1)" ${qrChunkIndex === qrChunks.length - 1 ? 'disabled style="opacity:0.35"' : ''}>Next ›</button>
+    </div>`;
+  }
+
+  html += `<div class="card" style="text-align:left">
+    <div class="card-body">
+      <div class="policy-type">📦 Export contains</div>
+      <div style="font-size:15px;font-weight:600">${policyCount} polic${policyCount === 1 ? 'y' : 'ies'}${isMulti ? ` · ${total} QR codes` : ''}</div>
+      <div style="font-size:12px;color:var(--text-2);margin-top:4px">⚠️ Keep this QR code private — it contains your policy data</div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:4px">📎 Document attachments are not included in QR export — use encrypted backup instead.</div>
     </div>
-    <button class="btn btn-ghost" onclick="goBack()" style="margin-top:16px">← Back</button>
+  </div>
+  <button class="btn btn-ghost" onclick="goBack()" style="margin-top:16px">← Back</button>
   </div>`;
 
   document.getElementById('app').innerHTML = html;
-  document.querySelector('.container div[style*="justify-content:center"]').appendChild(canvas);
+  renderCurrentQRChunk();
 }
+
+async function renderCurrentQRChunk() {
+  const holder = document.getElementById('qrCanvasHolder');
+  if (!holder) return;
+  const canvas = document.getElementById('qrCanvas');
+  try {
+    await QRCode.toCanvas(canvas, qrChunks[qrChunkIndex], {
+      width: 240, margin: 2, color: { dark: '#000', light: '#fff' }
+    });
+    canvas.style.display = 'block';
+    holder.innerHTML = '';
+    holder.appendChild(canvas);
+  } catch(e) {
+    holder.innerHTML = `<div style="color:var(--red);font-size:13px;padding:20px">QR chunk too large — try the encrypted backup instead.</div>`;
+  }
+}
+
+async function qrChunkNav(dir) {
+  const policies = await getPolicies();
+  qrChunkIndex = Math.max(0, Math.min(qrChunks.length - 1, qrChunkIndex + dir));
+  renderQRExportScreen(policies.length);
+}
+
 
 /* ═══════════════════════════════════════
    SCAN
@@ -1800,9 +2436,48 @@ function scanQRLoop() {
   scanAnimId = requestAnimationFrame(scanQRLoop);
 }
 
+// Chunk reassembly buffer
+let qrImportChunks = {}; // index -> data string
+let qrImportTotal = null;
+
 async function importQRData(raw) {
   try {
     const parsed = JSON.parse(raw);
+
+    // ── Chunked QR ──
+    if (parsed.cov_chunk === true) {
+      const { i, t, d } = parsed;
+      qrImportChunks[i] = d;
+      qrImportTotal = t;
+
+      const received = Object.keys(qrImportChunks).length;
+      if (received < t) {
+        // Need more chunks — keep scanner open and show progress
+        stopCamera();
+        showSheet(`
+          <div class="sheet-title">📲 Scanning QR Codes</div>
+          <div class="sheet-sub">Received ${received} of ${t} QR codes. Scan the next one.</div>
+          <div style="display:flex;gap:6px;justify-content:center;margin:16px 0">
+            ${Array.from({ length: t }, (_, idx) =>
+              `<div style="width:12px;height:12px;border-radius:50%;background:${qrImportChunks[idx] !== undefined ? 'var(--green)' : 'var(--border)'}"></div>`
+            ).join('')}
+          </div>
+          <button class="btn btn-primary" onclick="closeSheet();startQRScanDirect()">📷 Scan Next QR</button>
+          <button class="btn btn-ghost" onclick="qrImportChunks={};qrImportTotal=null;closeSheet();" style="margin-top:4px">Cancel</button>
+        `);
+        return;
+      }
+
+      // All chunks received — reassemble
+      const fullRaw = Array.from({ length: t }, (_, idx) => qrImportChunks[idx]).join('');
+      qrImportChunks = {};
+      qrImportTotal = null;
+      closeSheet();
+      await importQRData(fullRaw); // recurse with reassembled payload
+      return;
+    }
+
+    // ── Single QR ──
     const list = parsed.coverly ? parsed.policies : parsed;
     if (!Array.isArray(list)) throw new Error();
     for (const p of list) {
@@ -2200,12 +2875,19 @@ function showOCRResultSheet(extracted, rawText) {
       <input id="f_emergency" placeholder="Name or number for emergencies" value="">
     </div>
     <div class="field">
+      <label>Annual Premium (optional)</label>
+      <input id="f_premium" type="number" inputmode="decimal" placeholder="e.g. 450.00" min="0" step="0.01" value="">
+    </div>
+    <div class="field">
       <label>Notes (optional)</label>
       <textarea id="f_notes" placeholder="Excess amount, coverage details...">${esc(notes || '')}</textarea>
     </div>
   `;
 
   html += `<button class="btn btn-primary" onclick="savePolicy()" style="margin-top:4px">💾 Save Policy</button>`;
+
+  // Attach section
+  html += `<div id="attachSection"></div>`;
 
   // Raw text collapsible at the bottom
   html += `<details style="margin-top:20px;margin-bottom:8px">
@@ -2219,7 +2901,11 @@ function showOCRResultSheet(extracted, rawText) {
   closeSheet();
   activeTab = 'add';
   editingPolicyId = null;
+  pendingAttachments = [];
+  pendingThumbUrls.forEach(u => { if (u) URL.revokeObjectURL(u); });
+  pendingThumbUrls = [];
   document.getElementById('app').innerHTML = html;
+  refreshAttachSection();
 }
 
 function applyOCRResult(extracted) {
@@ -2471,6 +3157,7 @@ async function renderSettings() {
         </div>
       </div>
       <button class="btn btn-blue" onclick="startBackup()" style="margin-top:10px">⬇️ Back Up Now</button>
+      <button class="btn btn-ghost" onclick="exportCalendar()" style="margin-top:6px;font-size:13px">📅 Export Renewal Dates (.ics)</button>
       <button class="btn btn-ghost" onclick="startRestore()" style="margin-top:6px">📂 Restore from Backup</button>
       <button class="btn btn-ghost" onclick="exportQR()" style="margin-top:6px;font-size:13px">⬆️ Export via QR</button>
       <button class="btn btn-ghost" onclick="confirmLoadDemo()" style="margin-top:6px;font-size:13px">📋 Load Example Policies</button>
@@ -2619,6 +3306,7 @@ function clearAllData() {
   localStorage.clear();
   const req = indexedDB.deleteDatabase('coverlyDB');
   req.onsuccess = () => location.reload();
+  req.onerror = () => location.reload();
 }
 
 /* ═══════════════════════════════════════
@@ -2893,6 +3581,94 @@ function formatDate(d) {
 }
 
 /* ═══════════════════════════════════════
+   CALENDAR EXPORT (.ics)
+═══════════════════════════════════════ */
+async function exportCalendar() {
+  const policies = await getPolicies();
+  const withExpiry = policies.filter(p => p.expiry);
+
+  if (withExpiry.length === 0) {
+    toast('⚠️ No policies with expiry dates to export');
+    return;
+  }
+
+  function toICSDate(dateStr) {
+    // dateStr is YYYY-MM-DD — convert to YYYYMMDD for ICS all-day event
+    return dateStr.replace(/-/g, '');
+  }
+
+  function escICS(str) {
+    return (str || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  }
+
+  function uid() {
+    return `coverly-${Date.now()}-${Math.random().toString(36).slice(2)}@coverly`;
+  }
+
+  const dtStamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+
+  let events = [];
+
+  for (const p of withExpiry) {
+    const meta = getPolicyMeta(p.type);
+    const expiryICS = toICSDate(p.expiry);
+    // Expiry event (all-day)
+    events.push([
+      'BEGIN:VEVENT',
+      `UID:${uid()}`,
+      `DTSTAMP:${dtStamp}`,
+      `DTSTART;VALUE=DATE:${expiryICS}`,
+      `SUMMARY:${escICS(`${meta.icon} ${p.insurer || meta.label} — Policy Expires`)}`,
+      `DESCRIPTION:${escICS(`Policy: ${p.number}${p.phone ? '\\nPhone: ' + p.phone : ''}${p.premium ? '\\nPremium: £' + Number(p.premium).toFixed(2) : ''}`)}`,
+      'CATEGORIES:Insurance,Coverly',
+      'BEGIN:VALARM',
+      'TRIGGER:-P30D',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:${escICS(`${p.insurer || meta.label} policy expires in 30 days`)}`,
+      'END:VALARM',
+      'END:VEVENT',
+    ].join('\r\n'));
+
+    // Renewal reminder 30 days before
+    const renewDate = new Date(p.expiry);
+    renewDate.setDate(renewDate.getDate() - 30);
+    const renewICS = renewDate.toISOString().slice(0, 10).replace(/-/g, '');
+    events.push([
+      'BEGIN:VEVENT',
+      `UID:${uid()}`,
+      `DTSTAMP:${dtStamp}`,
+      `DTSTART;VALUE=DATE:${renewICS}`,
+      `SUMMARY:${escICS(`🔔 ${p.insurer || meta.label} — Renewal Reminder`)}`,
+      `DESCRIPTION:${escICS(`${p.insurer || meta.label} (${p.number}) expires on ${formatDate(p.expiry)}. Good time to start comparing quotes.`)}`,
+      'CATEGORIES:Insurance,Coverly',
+      'END:VEVENT',
+    ].join('\r\n'));
+  }
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Coverly//Insurance Vault//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:Coverly Insurance Renewals`,
+    `X-WR-CALDESC:Policy expiry dates and renewal reminders from Coverly`,
+    ...events,
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'coverly-renewals.ics';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  toast(`📅 Exported ${withExpiry.length} renewal date${withExpiry.length === 1 ? '' : 's'}`);
+}
+
+/* ═══════════════════════════════════════
    ENCRYPTED BACKUP & RESTORE
 ═══════════════════════════════════════ */
 
@@ -2971,7 +3747,14 @@ async function doBackup() {
 
   try {
     const policies = await getPolicies();
-    const payload = JSON.stringify({ coverly: true, v: 3, exportedAt: Date.now(), policies });
+    const allDocs = await getAllDocuments();
+    // Serialize document binary data as base64 for JSON transport
+    const docsForExport = allDocs.map(doc => ({
+      ...doc,
+      data: doc.data ? btoa(String.fromCharCode(...new Uint8Array(doc.data))) : null,
+      _base64: true,
+    }));
+    const payload = JSON.stringify({ coverly: true, v: 3, exportedAt: Date.now(), policies, documents: docsForExport });
     const encrypted = await encryptData(payload, p1);
 
     // Download
@@ -3014,6 +3797,9 @@ async function doBackup() {
       </div>
 
       <button class="btn btn-primary" onclick="closeSheet()">Got it</button>
+      <div style="font-size:12px;color:var(--text-3);margin-top:12px;line-height:1.5">
+        📎 Attached documents are included in the backup. Files with many attachments may produce a larger backup file.
+      </div>
     `);
   } catch (err) {
     if (btn) { btn.textContent = '⬇️ Download Backup File'; btn.disabled = false; }
@@ -3104,9 +3890,29 @@ async function doRestore() {
     const list = data.policies || (Array.isArray(data) ? data : null);
     if (!list) throw new Error('Invalid backup structure');
 
+    // Restore policies (strip old IDs so they get new ones)
+    const idMap = {}; // oldId -> newId (for re-linking documents)
     for (const p of list) {
-      const { id, ...rest } = p;
-      await addPolicy(rest);
+      const { id: oldId, ...rest } = p;
+      const newId = await addPolicy(rest);
+      if (oldId !== undefined) idMap[oldId] = newId;
+    }
+
+    // Restore documents if present
+    if (Array.isArray(data.documents)) {
+      for (const doc of data.documents) {
+        const { id: _docId, policyId: oldPolicyId, data: b64data, _base64, ...docRest } = doc;
+        const newPolicyId = idMap[oldPolicyId];
+        if (newPolicyId === undefined) continue; // orphaned doc — skip
+        let binData = null;
+        if (b64data && _base64) {
+          const binary = atob(b64data);
+          binData = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) binData[i] = binary.charCodeAt(i);
+          binData = binData.buffer;
+        }
+        await addDocument({ policyId: newPolicyId, data: binData, ...docRest });
+      }
     }
 
     restoreFileBuffer = null;
