@@ -3066,7 +3066,15 @@ function updatePinDots() {
 
 function checkPin() {
   if (pinMode === 'unlock') {
-    if (pinBuffer === appPin) {
+    if (!appPin) {
+      // PIN enabled flag set but no PIN stored — inconsistent state, clear and let through
+      pinEnabled = false;
+      isUnlocked = true;
+      localStorage.removeItem('coverly_pin_enabled');
+      renderHome();
+      return;
+    }
+    if (pinBuffer.length === 4 && pinBuffer === appPin) {
       haptic('success');
       isUnlocked = true;
       renderHome();
@@ -4159,7 +4167,7 @@ async function boot() {
     return;
   }
 
-  if (pinEnabled && !isUnlocked) {
+  if (pinEnabled && appPin && !isUnlocked) {
     renderPinScreen('unlock');
     return;
   }
