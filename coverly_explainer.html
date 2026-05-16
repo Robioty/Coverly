@@ -632,7 +632,7 @@
     <div class="cta-wrap">
       <h2>Stop searching.<br>Start knowing.</h2>
       <p>Free. Private. Works offline. No account needed.</p>
-      <button class="cta-btn" onclick="window.open('https://coverly.app','_blank')">Get Coverly</button>
+      <button class="cta-btn" onclick="window.open('https://robioty.github.io/Coverly/','_blank')">Get Coverly</button>
     </div>
   </div>
 
@@ -648,7 +648,6 @@
   const SCENES = 6;
   let current = 0;
   let autoTimer = null;
-  const AUTO_DELAY = [4500, 5000, 5500, 5000, 5000, 99999]; // ms per scene
 
   const scenes = Array.from(document.querySelectorAll('.scene'));
   const nav = document.getElementById('nav');
@@ -665,9 +664,7 @@
 
   function goToScene(n) {
     if (n < 0 || n >= SCENES) return;
-    clearTimeout(autoTimer);
 
-    // Hide hint after first advance
     if (n > 0) hint.style.display = 'none';
 
     scenes[current].classList.remove('active');
@@ -679,16 +676,6 @@
     bar.style.width = ((current / (SCENES - 1)) * 100) + '%';
 
     animateScene(current);
-    scheduleAuto();
-  }
-
-  function nextScene() { goToScene(current + 1); }
-
-  function scheduleAuto() {
-    clearTimeout(autoTimer);
-    if (current < SCENES - 1) {
-      autoTimer = setTimeout(nextScene, AUTO_DELAY[current]);
-    }
   }
 
   // Scene-specific animations
@@ -729,6 +716,8 @@
     }
   }
 
+  function nextScene() { goToScene(current + 1); }
+
   // Tap anywhere to advance (except last scene CTA)
   document.getElementById('stage').addEventListener('click', () => {
     if (current < SCENES - 1) nextScene();
@@ -742,7 +731,6 @@
 
   // Start
   animateScene(0);
-  scheduleAuto();
 </script>
 </body>
 </html>
