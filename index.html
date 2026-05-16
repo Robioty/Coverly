@@ -864,7 +864,8 @@ let locationName = null;
 let activeTab = 'home';
 let appPin = localStorage.getItem('coverly_pin') || null;
 let pinEnabled = localStorage.getItem('coverly_pin_enabled') === '1';
-let isUnlocked = !pinEnabled;
+// sessionStorage clears on every page refresh/close — so unlock only persists for the tab session
+let isUnlocked = !pinEnabled || sessionStorage.getItem('coverly_unlocked') === '1';
 let scanAnimId = null;
 let pendingOCRData = null;
 let editingPolicyId = null;
@@ -3067,7 +3068,7 @@ function updatePinDots() {
 function checkPin() {
   if (pinMode === 'unlock') {
     if (!appPin) {
-      // PIN enabled flag set but no PIN stored — inconsistent state, clear and let through
+      // Inconsistent state — PIN enabled flag set but no PIN stored, clear and let through
       pinEnabled = false;
       isUnlocked = true;
       localStorage.removeItem('coverly_pin_enabled');
@@ -3077,6 +3078,7 @@ function checkPin() {
     if (pinBuffer.length === 4 && pinBuffer === appPin) {
       haptic('success');
       isUnlocked = true;
+      sessionStorage.setItem('coverly_unlocked', '1');
       renderHome();
     } else {
       haptic('error');
@@ -3294,6 +3296,7 @@ function togglePin(enabled) {
   } else {
     localStorage.removeItem('coverly_pin');
     localStorage.removeItem('coverly_pin_enabled');
+    sessionStorage.removeItem('coverly_unlocked');
     pinEnabled = false;
     appPin = null;
     toast('🔓 PIN removed');
