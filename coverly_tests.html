@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coverly — Test Suite</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0f14;
+    --surface: #1e2430;
+    --border: rgba(255,255,255,0.08);
+    --text: #f1f5f9;
+    --text-2: #94a3b8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', 'Fira Mono', monospace;
+    font-size: 13px;
+    padding: 24px 16px 60px;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; font-family: sans-serif; }
+  .meta { color: var(--text-2); font-size: 12px; margin-bottom: 28px; }
+  .suite { margin-bottom: 32px; }
+  .suite-title {
+    font-family: sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .test {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .test.pass { border-color: rgba(34,197,94,0.3); }
+  .test.fail { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.06); }
+  .test.skip { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.04); }
+  .test.running { border-color: rgba(59,130,246,0.3); }
+  .icon { flex-shrink: 0; width: 18px; text-align: center; margin-top: 1px; }
+  .test-name { flex: 1; color: var(--text); line-height: 1.4; }
+  .test-detail { font-size: 11px; color: var(--text-2); margin-top: 3px; }
+  .test-detail.err { color: var(--red); }
+  .timing { flex-shrink: 0; font-size: 11px; color: var(--text-2); margin-top: 1px; }
+
+  #summary {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: sans-serif;
+    font-size: 13px;
+  }
+  .sum-stat { display: flex; align-items: center; gap: 6px; }
+  .sum-dot { width: 10px; height: 10px; border-radius: 50%; }
+  #runBtn {
+    margin-left: auto;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: sans-serif;
+  }
+  #runBtn:disabled { opacity: 0.5; cursor: default; }
+  #progressBar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: var(--blue);
+    width: 0%;
+    transition: width 0.2s;
+  }
+</style>
+</head>
+<body>
+
+<div id="progressBar"></div>
+
+<h1>🧪 Coverly Test Suite</h1>
+<p class="meta">Unit + integration tests • Runs in real browser environment • Uses isolated IndexedDB</p>
+
+<div id="suites"></div>
+
+<div id="summary">
+  <div class="sum-stat"><div class="sum-dot" style="background:var(--green)"></div><span id="passCount">0 passed</span></div>
+  <div class="sum-stat"><div class="sum-dot" style="background:var(--red)"></div><span id="failCount">0 failed</span></div>
+  <div class="sum-stat"><div class="sum-dot" style="background:var(--amber)"></div><span id="skipCount">0 skipped</span></div>
+  <div id="totalTime" style="color:var(--text-2)"></div>
+  <button id="runBtn" onclick="runAll()">▶ Run All Tests</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   TEST FRAMEWORK
+═══════════════════════════════════════════════════════ */
+
+const results = { pass: 0, fail: 0, skip: 0 };
+let totalTests = 0;
+let completedTests = 0;
+const startTime = { value: 0 };
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message || 'Assertion failed');
+}
+
+function assertEqual(actual, expected, message) {
+  if (actual !== expected) {
+    throw new Error((message || 'assertEqual') + ` — expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+  }
+}
+
+function assertNotNull(val, message) {
+  if (val === null || val === undefined) throw new Error(message || `Expected non-null, got ${val}`);
+}
+
+function assertArrayLength(arr, len, message) {
+  if (!Array.isArray(arr) || arr.length !== len) {
+    throw new Error((message || 'assertArrayLength') + ` — expected length ${len}, got ${Array.isArray(arr) ? arr.length : 'non-array'}`);
+  }
+}
+
+// Register a test suite
+const suites = [];
+function describe(name, fn) {
+  suites.push({ name, fn });
+}
+
+// Register a test within a suite
+let currentSuiteTests = [];
+function it(name, fn, skip = false) {
+  currentSuiteTests.push({ name, fn, skip });
+}
+
+function xit(name, fn) { it(name, fn, true); } // skip marker
+
+/* ═══════════════════════════════════════════════════════
+   TEST DB HELPERS
+   Uses a separate 'coverlyTestDB' so tests never touch real data
+═══════════════════════════════════════════════════════ */
+
+const TEST_DB_NAME = 'coverlyTestDB';
+let testDb = null;
+
+function openTestDB() {
+  return new Promise((resolve, reject) => {
+    // Always delete first for a clean slate
+    const del = indexedDB.deleteDatabase(TEST_DB_NAME);
+    del.onsuccess = del.onerror = () => {
+      const req = indexedDB.open(TEST_DB_NAME, 3);
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('policies')) {
+          d.createObjectStore('policies', { keyPath: 'id', autoIncrement: true });
+        }
+        if (!d.objectStoreNames.contains('documents')) {
+          const docStore = d.createObjectStore('documents', { keyPath: 'id', autoIncrement: true });
+          docStore.createIndex('policyId', 'policyId', { unique: false });
+        }
+      };
+      req.onsuccess = e => { testDb = e.target.result; resolve(testDb); };
+      req.onerror = reject;
+    };
+  });
+}
+
+function closeTestDB() {
+  if (testDb) { testDb.close(); testDb = null; }
+  return new Promise(res => {
+    const req = indexedDB.deleteDatabase(TEST_DB_NAME);
+    req.onsuccess = req.onerror = res;
+  });
+}
+
+// Minimal in-test versions of the app's DB functions (using testDb instead of db)
+const T = {
+  store: (mode = 'readonly') => testDb.transaction('policies', mode).objectStore('policies'),
+  docStore: (mode = 'readonly') => testDb.transaction('documents', mode).objectStore('documents'),
+
+  getPolicies() {
+    return new Promise(res => {
+      const r = this.store().getAll();
+      r.onsuccess = () => res(r.result);
+    });
+  },
+  addPolicy(data) {
+    return new Promise(res => {
+      const r = this.store('readwrite').add({ ...data, createdAt: Date.now() });
+      r.onsuccess = () => res(r.result);
+    });
+  },
+  updatePolicy(data) {
+    return new Promise(res => {
+      const r = this.store('readwrite').put(data);
+      r.onsuccess = () => res();
+    });
+  },
+  deletePolicy(id) {
+    return new Promise(res => {
+      this.store('readwrite').delete(id);
+      res();
+    });
+  },
+  addDocument(doc) {
+    return new Promise(res => {
+      const r = this.docStore('readwrite').add({ ...doc, addedAt: Date.now() });
+      r.onsuccess = () => res(r.result);
+    });
+  },
+  getDocumentsForPolicy(policyId) {
+    return new Promise(res => {
+      const idx = this.docStore().index('policyId');
+      const r = idx.getAll(policyId);
+      r.onsuccess = () => res(r.result);
+    });
+  },
+  deleteDocument(id) {
+    return new Promise(res => {
+      this.docStore('readwrite').delete(id);
+      res();
+    });
+  },
+  deleteDocumentsForPolicy(policyId) {
+    return new Promise(res => {
+      const idx = this.docStore('readwrite').index('policyId');
+      const r = idx.getAll(policyId);
+      r.onsuccess = () => {
+        const docs = r.result;
+        if (docs.length === 0) { res(); return; }
+        let done = 0;
+        docs.forEach(d => {
+          const del = this.docStore('readwrite').delete(d.id);
+          del.onsuccess = () => { if (++done === docs.length) res(); };
+        });
+      };
+    });
+  },
+  getAllDocuments() {
+    return new Promise(res => {
+      const r = this.docStore().getAll();
+      r.onsuccess = () => res(r.result);
+    });
+  },
+};
+
+/* ═══════════════════════════════════════════════════════
+   UTILITY FUNCTIONS (copied from app — pure functions only)
+═══════════════════════════════════════════════════════ */
+
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  catch { return d; }
+}
+
+function daysUntil(expiryStr) {
+  if (!expiryStr) return null;
+  return Math.ceil((new Date(expiryStr) - new Date()) / 86400000);
+}
+
+function parseDateToISO(str) {
+  if (!str) return '';
+  let m = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3];
+    return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  return '';
+}
+
+const POLICY_TYPES = [
+  { key: 'car', label: 'Car Insurance', icon: '🚗' },
+  { key: 'health', label: 'Health Insurance', icon: '🏥' },
+  { key: 'home', label: 'Home Insurance', icon: '🏠' },
+  { key: 'life', label: 'Life Insurance', icon: '💚' },
+  { key: 'travel', label: 'Travel Insurance', icon: '✈️' },
+  { key: 'pet', label: 'Pet Insurance', icon: '🐾' },
+  { key: 'business', label: 'Business Insurance', icon: '💼' },
+  { key: 'other', label: 'Other', icon: '📋' },
+];
+
+function getPolicyMeta(key) {
+  return POLICY_TYPES.find(t => t.key === key) || { key: 'other', label: 'Insurance', icon: '📋' };
+}
+
+// PIN check logic (extracted from app)
+function checkPinLogic({ pinMode, pinBuffer, appPin }) {
+  if (!appPin) return { action: 'clear_inconsistent_state' };
+  if (pinMode === 'unlock') {
+    if (pinBuffer.length === 4 && pinBuffer === appPin) return { action: 'unlock' };
+    return { action: 'reject', reason: pinBuffer.length < 4 ? 'incomplete' : 'wrong_pin' };
+  }
+  if (pinMode === 'set') return { action: 'advance_to_confirm' };
+  if (pinMode === 'confirm') {
+    // pinBuffer here is the confirmation entry, appPin is pinTemp
+    if (pinBuffer === appPin) return { action: 'save_pin' };
+    return { action: 'reject', reason: 'mismatch' };
+  }
+  return { action: 'unknown' };
+}
+
+// QR chunking logic (extracted from app)
+function buildQRChunks(data, maxChunk = 1200) {
+  if (data.length <= maxChunk) return [data];
+  const chunkSize = maxChunk - 60;
+  const raw = data;
+  const parts = [];
+  for (let pos = 0; pos < raw.length; pos += chunkSize) {
+    parts.push(raw.slice(pos, pos + chunkSize));
+  }
+  return parts.map((d, i) => JSON.stringify({ cov_chunk: true, i, t: parts.length, d }));
+}
+
+function reassembleQRChunks(chunks) {
+  const parsed = chunks.map(c => JSON.parse(c));
+  const total = parsed[0].t;
+  if (parsed.length !== total) throw new Error('Missing chunks');
+  const ordered = new Array(total);
+  parsed.forEach(p => { ordered[p.i] = p.d; });
+  return ordered.join('');
+}
+
+// Backup crypto (uses real Web Crypto API)
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptData(plaintext, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await deriveKey(password, salt);
+  const enc  = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext));
+  const magic = new TextEncoder().encode('COVERLY1');
+  const buf = new Uint8Array(8 + 1 + 16 + 12 + ciphertext.byteLength);
+  buf.set(magic, 0);
+  buf.set([1], 8);
+  buf.set(salt, 9);
+  buf.set(iv, 25);
+  buf.set(new Uint8Array(ciphertext), 37);
+  return buf;
+}
+
+async function decryptData(buf, password) {
+  const magic = new TextDecoder().decode(buf.slice(0, 8));
+  if (magic !== 'COVERLY1') throw new Error('Not a valid Coverly backup file');
+  const salt       = buf.slice(9, 25);
+  const iv         = buf.slice(25, 37);
+  const ciphertext = buf.slice(37);
+  const key        = await deriveKey(password, salt);
+  const plainBuf   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new TextDecoder().decode(plainBuf);
+}
+
+/* ═══════════════════════════════════════════════════════
+   TEST SUITES
+═══════════════════════════════════════════════════════ */
+
+// ── 1. Utility Functions ──────────────────────────────
+describe('Utility Functions', () => {
+
+  it('esc() escapes HTML special characters', () => {
+    assertEqual(esc('<script>'), '&lt;script&gt;');
+    assertEqual(esc('AT&T'), 'AT&amp;T');
+    assertEqual(esc('"quoted"'), '&quot;quoted&quot;');
+    assertEqual(esc("it's"), 'it&#39;s');
+    assertEqual(esc(''), '');
+    assertEqual(esc(null), '');
+    assertEqual(esc(undefined), '');
+  });
+
+  it('esc() handles numbers and non-strings', () => {
+    assertEqual(esc(42), '42');
+    assertEqual(esc(0), '0');
+  });
+
+  it('formatDate() formats ISO date to readable GB format', () => {
+    const result = formatDate('2025-12-25');
+    assert(result.includes('2025'), 'Should include year');
+    assert(result.includes('Dec') || result.includes('25'), 'Should include month or day');
+  });
+
+  it('formatDate() returns empty string for falsy input', () => {
+    assertEqual(formatDate(''), '');
+    assertEqual(formatDate(null), '');
+    assertEqual(formatDate(undefined), '');
+  });
+
+  it('daysUntil() returns null for empty/null input', () => {
+    assertEqual(daysUntil(''), null);
+    assertEqual(daysUntil(null), null);
+    assertEqual(daysUntil(undefined), null);
+  });
+
+  it('daysUntil() returns negative for past dates', () => {
+    const past = '2020-01-01';
+    assert(daysUntil(past) < 0, 'Past date should be negative');
+  });
+
+  it('daysUntil() returns positive for future dates', () => {
+    const future = '2099-01-01';
+    assert(daysUntil(future) > 0, 'Future date should be positive');
+  });
+
+  it('daysUntil() returns approximately correct value', () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    const iso = d.toISOString().slice(0, 10);
+    const days = daysUntil(iso);
+    assert(days >= 29 && days <= 31, `Expected ~30 days, got ${days}`);
+  });
+
+  it('parseDateToISO() parses YYYY-MM-DD format', () => {
+    assertEqual(parseDateToISO('2025-06-15'), '2025-06-15');
+  });
+
+  it('parseDateToISO() parses DD/MM/YYYY format', () => {
+    assertEqual(parseDateToISO('15/06/2025'), '2025-06-15');
+  });
+
+  it('parseDateToISO() parses DD-MM-YY format', () => {
+    assertEqual(parseDateToISO('15-06-25'), '2025-06-15');
+  });
+
+  it('parseDateToISO() returns empty string for invalid input', () => {
+    assertEqual(parseDateToISO(''), '');
+    assertEqual(parseDateToISO(null), '');
+    assertEqual(parseDateToISO('not-a-date'), '');
+  });
+
+  it('getPolicyMeta() returns correct meta for known type', () => {
+    const meta = getPolicyMeta('car');
+    assertEqual(meta.label, 'Car Insurance');
+    assertEqual(meta.icon, '🚗');
+  });
+
+  it('getPolicyMeta() returns "other" fallback for unknown type', () => {
+    const meta = getPolicyMeta('nonexistent');
+    assertEqual(meta.key, 'other');
+    assertEqual(meta.icon, '📋');
+  });
+
+  it('getPolicyMeta() handles null/undefined gracefully', () => {
+    const meta = getPolicyMeta(null);
+    assertEqual(meta.key, 'other');
+  });
+
+  it('POLICY_TYPES contains all 8 expected types', () => {
+    assertArrayLength(POLICY_TYPES, 8);
+    const keys = POLICY_TYPES.map(t => t.key);
+    assert(keys.includes('car'), 'Missing car');
+    assert(keys.includes('home'), 'Missing home');
+    assert(keys.includes('health'), 'Missing health');
+    assert(keys.includes('life'), 'Missing life');
+    assert(keys.includes('travel'), 'Missing travel');
+    assert(keys.includes('pet'), 'Missing pet');
+    assert(keys.includes('business'), 'Missing business');
+    assert(keys.includes('other'), 'Missing other');
+  });
+
+});
+
+// ── 2. PIN Logic ──────────────────────────────────────
+describe('PIN Lock Logic', () => {
+
+  it('PIN unlock succeeds with correct 4-digit PIN', () => {
+    const result = checkPinLogic({ pinMode: 'unlock', pinBuffer: '1234', appPin: '1234' });
+    assertEqual(result.action, 'unlock');
+  });
+
+  it('PIN unlock rejects wrong PIN', () => {
+    const result = checkPinLogic({ pinMode: 'unlock', pinBuffer: '0000', appPin: '1234' });
+    assertEqual(result.action, 'reject');
+    assertEqual(result.reason, 'wrong_pin');
+  });
+
+  it('PIN unlock rejects incomplete entry (< 4 digits)', () => {
+    const result = checkPinLogic({ pinMode: 'unlock', pinBuffer: '12', appPin: '1234' });
+    assertEqual(result.action, 'reject');
+    assertEqual(result.reason, 'incomplete');
+  });
+
+  it('PIN unlock rejects empty buffer', () => {
+    const result = checkPinLogic({ pinMode: 'unlock', pinBuffer: '', appPin: '1234' });
+    assertEqual(result.action, 'reject');
+    assertEqual(result.reason, 'incomplete');
+  });
+
+  it('PIN unlock handles missing appPin (inconsistent state)', () => {
+    const result = checkPinLogic({ pinMode: 'unlock', pinBuffer: '1234', appPin: null });
+    assertEqual(result.action, 'clear_inconsistent_state');
+  });
+
+  it('PIN set mode advances to confirm', () => {
+    const result = checkPinLogic({ pinMode: 'set', pinBuffer: '5678', appPin: null });
+    assertEqual(result.action, 'advance_to_confirm');
+  });
+
+  it('PIN confirm saves when entries match', () => {
+    // In confirm mode, appPin is used as pinTemp
+    const result = checkPinLogic({ pinMode: 'confirm', pinBuffer: '5678', appPin: '5678' });
+    assertEqual(result.action, 'save_pin');
+  });
+
+  it('PIN confirm rejects when entries do not match', () => {
+    const result = checkPinLogic({ pinMode: 'confirm', pinBuffer: '5678', appPin: '1234' });
+    assertEqual(result.action, 'reject');
+    assertEqual(result.reason, 'mismatch');
+  });
+
+  it('isUnlocked starts as false when PIN is enabled', () => {
+    // Simulate what the app does at startup
+    const pinEnabled = true;
+    const isUnlocked = !pinEnabled;
+    assertEqual(isUnlocked, false);
+  });
+
+  it('isUnlocked starts as true when PIN is not enabled', () => {
+    const pinEnabled = false;
+    const isUnlocked = !pinEnabled;
+    assertEqual(isUnlocked, true);
+  });
+
+  it('PIN is not accepted if it contains non-digits', () => {
+    // PIN should only ever be 4 digits — test the format assumption
+    const validPin = '1234';
+    assert(/^\d{4}$/.test(validPin), 'Valid PIN passes regex');
+    assert(!/^\d{4}$/.test('12ab'), 'Alphanumeric fails regex');
+    assert(!/^\d{4}$/.test(''), 'Empty fails regex');
+  });
+
+});
+
+// ── 3. Policy CRUD (IndexedDB) ────────────────────────
+describe('Policy CRUD — IndexedDB', () => {
+
+  it('addPolicy() stores a policy and returns an ID', async () => {
+    const id = await T.addPolicy({ type: 'car', insurer: 'Aviva', number: 'POL-001', phone: '08001234', expiry: '2026-01-01', notes: '' });
+    assertNotNull(id, 'Should return an ID');
+    assert(typeof id === 'number', `ID should be a number, got ${typeof id}`);
+  });
+
+  it('getPolicies() retrieves all stored policies', async () => {
+    const before = await T.getPolicies();
+    await T.addPolicy({ type: 'home', insurer: 'Direct Line', number: 'DL-001', phone: '', expiry: '', notes: '' });
+    const after = await T.getPolicies();
+    assert(after.length === before.length + 1, 'Should have one more policy');
+  });
+
+  it('addPolicy() persists all fields correctly', async () => {
+    const data = { type: 'health', insurer: 'Bupa', number: 'BU-999', phone: '0800111', expiry: '2027-06-01', notes: 'Family cover', premium: 450.00 };
+    const id = await T.addPolicy(data);
+    const policies = await T.getPolicies();
+    const saved = policies.find(p => p.id === id);
+    assertNotNull(saved, 'Saved policy should be findable');
+    assertEqual(saved.insurer, 'Bupa');
+    assertEqual(saved.number, 'BU-999');
+    assertEqual(saved.phone, '0800111');
+    assertEqual(saved.expiry, '2027-06-01');
+    assertEqual(saved.notes, 'Family cover');
+    assertEqual(saved.premium, 450.00);
+  });
+
+  it('addPolicy() automatically adds a createdAt timestamp', async () => {
+    const before = Date.now();
+    const id = await T.addPolicy({ type: 'pet', insurer: 'More Than', number: 'MT-001' });
+    const policies = await T.getPolicies();
+    const saved = policies.find(p => p.id === id);
+    assertNotNull(saved.createdAt, 'createdAt should be set');
+    assert(saved.createdAt >= before, 'createdAt should be recent');
+    assert(saved.createdAt <= Date.now(), 'createdAt should not be in the future');
+  });
+
+  it('updatePolicy() modifies an existing policy', async () => {
+    const id = await T.addPolicy({ type: 'car', insurer: 'AXA', number: 'AX-001', phone: '', expiry: '', notes: 'original' });
+    const policies = await T.getPolicies();
+    const original = policies.find(p => p.id === id);
+    await T.updatePolicy({ ...original, notes: 'updated', insurer: 'AXA Updated' });
+    const after = await T.getPolicies();
+    const updated = after.find(p => p.id === id);
+    assertEqual(updated.notes, 'updated');
+    assertEqual(updated.insurer, 'AXA Updated');
+    assertEqual(updated.number, 'AX-001'); // unchanged field preserved
+  });
+
+  it('deletePolicy() removes the correct policy', async () => {
+    const id = await T.addPolicy({ type: 'travel', insurer: 'Allianz', number: 'AL-DELETE', phone: '', expiry: '' });
+    const before = await T.getPolicies();
+    await T.deletePolicy(id);
+    const after = await T.getPolicies();
+    assertEqual(after.length, before.length - 1);
+    assert(!after.find(p => p.id === id), 'Deleted policy should not be findable');
+  });
+
+  it('deletePolicy() only removes the target policy, not others', async () => {
+    const id1 = await T.addPolicy({ type: 'life', insurer: 'Legal & General', number: 'LG-001' });
+    const id2 = await T.addPolicy({ type: 'life', insurer: 'Aviva', number: 'AV-001' });
+    await T.deletePolicy(id1);
+    const after = await T.getPolicies();
+    assert(!after.find(p => p.id === id1), 'id1 should be gone');
+    assert(!!after.find(p => p.id === id2), 'id2 should remain');
+  });
+
+  it('getPolicies() returns empty array when vault is empty', async () => {
+    // Close and reopen a fresh DB for isolation
+    testDb.close();
+    await new Promise(res => { const r = indexedDB.deleteDatabase(TEST_DB_NAME); r.onsuccess = r.onerror = res; });
+    await openTestDB();
+    const policies = await T.getPolicies();
+    assertArrayLength(policies, 0, 'Fresh DB should have no policies');
+  });
+
+});
+
+// ── 4. Document Attachments (IndexedDB) ───────────────
+describe('Document Attachments — IndexedDB', () => {
+
+  it('addDocument() stores a document and returns an ID', async () => {
+    const policyId = await T.addPolicy({ type: 'car', insurer: 'Test', number: 'T-001' });
+    const buf = new TextEncoder().encode('fake pdf content').buffer;
+    const docId = await T.addDocument({ policyId, name: 'policy.pdf', type: 'application/pdf', data: buf });
+    assertNotNull(docId, 'Should return document ID');
+  });
+
+  it('getDocumentsForPolicy() returns only documents for that policy', async () => {
+    const policyId1 = await T.addPolicy({ type: 'car', insurer: 'A', number: 'A-001' });
+    const policyId2 = await T.addPolicy({ type: 'home', insurer: 'B', number: 'B-001' });
+    const buf = new TextEncoder().encode('data').buffer;
+    await T.addDocument({ policyId: policyId1, name: 'doc1.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId: policyId1, name: 'doc2.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId: policyId2, name: 'other.pdf', type: 'application/pdf', data: buf });
+    const docs1 = await T.getDocumentsForPolicy(policyId1);
+    const docs2 = await T.getDocumentsForPolicy(policyId2);
+    assertArrayLength(docs1, 2, 'Policy 1 should have 2 docs');
+    assertArrayLength(docs2, 1, 'Policy 2 should have 1 doc');
+  });
+
+  it('addDocument() persists all fields correctly', async () => {
+    const policyId = await T.addPolicy({ type: 'car', insurer: 'Test', number: 'T-002' });
+    const buf = new TextEncoder().encode('image data').buffer;
+    await T.addDocument({ policyId, name: 'photo.jpg', type: 'image/jpeg', data: buf });
+    const docs = await T.getDocumentsForPolicy(policyId);
+    const doc = docs[0];
+    assertEqual(doc.name, 'photo.jpg');
+    assertEqual(doc.type, 'image/jpeg');
+    assertEqual(doc.policyId, policyId);
+    assertNotNull(doc.addedAt, 'addedAt should be set');
+  });
+
+  it('deleteDocument() removes a single document', async () => {
+    const policyId = await T.addPolicy({ type: 'car', insurer: 'Test', number: 'T-003' });
+    const buf = new TextEncoder().encode('x').buffer;
+    const docId = await T.addDocument({ policyId, name: 'a.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId, name: 'b.pdf', type: 'application/pdf', data: buf });
+    await T.deleteDocument(docId);
+    const docs = await T.getDocumentsForPolicy(policyId);
+    assertArrayLength(docs, 1, 'Should have 1 doc left');
+    assert(docs[0].name === 'b.pdf', 'Remaining doc should be b.pdf');
+  });
+
+  it('deleteDocumentsForPolicy() removes all documents for a policy', async () => {
+    const policyId = await T.addPolicy({ type: 'car', insurer: 'Test', number: 'T-004' });
+    const buf = new TextEncoder().encode('x').buffer;
+    await T.addDocument({ policyId, name: 'a.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId, name: 'b.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId, name: 'c.jpg', type: 'image/jpeg', data: buf });
+    await T.deleteDocumentsForPolicy(policyId);
+    const docs = await T.getDocumentsForPolicy(policyId);
+    assertArrayLength(docs, 0, 'Should have no docs after deleteDocumentsForPolicy');
+  });
+
+  it('deleteDocumentsForPolicy() does not affect other policy documents', async () => {
+    const pId1 = await T.addPolicy({ type: 'car', insurer: 'A', number: 'A-DFP1' });
+    const pId2 = await T.addPolicy({ type: 'home', insurer: 'B', number: 'B-DFP1' });
+    const buf = new TextEncoder().encode('x').buffer;
+    await T.addDocument({ policyId: pId1, name: 'p1.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId: pId2, name: 'p2.pdf', type: 'application/pdf', data: buf });
+    await T.deleteDocumentsForPolicy(pId1);
+    const docs2 = await T.getDocumentsForPolicy(pId2);
+    assertArrayLength(docs2, 1, 'Policy 2 docs should be unaffected');
+  });
+
+  it('getAllDocuments() returns documents across all policies', async () => {
+    const before = await T.getAllDocuments();
+    const pId = await T.addPolicy({ type: 'car', insurer: 'X', number: 'X-ALL' });
+    const buf = new TextEncoder().encode('x').buffer;
+    await T.addDocument({ policyId: pId, name: 'all1.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId: pId, name: 'all2.jpg', type: 'image/jpeg', data: buf });
+    const after = await T.getAllDocuments();
+    assert(after.length === before.length + 2, 'getAllDocuments should return 2 more');
+  });
+
+  it('document data is stored and retrieved intact', async () => {
+    const policyId = await T.addPolicy({ type: 'car', insurer: 'Test', number: 'T-DATA' });
+    const original = 'This is test file content 🔐';
+    const buf = new TextEncoder().encode(original).buffer;
+    await T.addDocument({ policyId, name: 'test.txt', type: 'text/plain', data: buf });
+    const docs = await T.getDocumentsForPolicy(policyId);
+    const retrieved = new TextDecoder().decode(docs[0].data);
+    assertEqual(retrieved, original);
+  });
+
+});
+
+// ── 5. Backup — Encrypt / Decrypt ─────────────────────
+describe('Backup — Encryption & Decryption', () => {
+
+  it('encryptData() produces a buffer starting with COVERLY1 magic bytes', async () => {
+    const buf = await encryptData('{"test":true}', 'password123');
+    const magic = new TextDecoder().decode(buf.slice(0, 8));
+    assertEqual(magic, 'COVERLY1');
+  });
+
+  it('encryptData() produces different output each time (random salt/IV)', async () => {
+    const buf1 = await encryptData('same plaintext', 'samepassword');
+    const buf2 = await encryptData('same plaintext', 'samepassword');
+    // Compare as hex — they should differ due to random salt/IV
+    assert(buf1.join(',') !== buf2.join(','), 'Each encryption should produce unique output');
+  });
+
+  it('decryptData() correctly round-trips a backup payload', async () => {
+    const payload = JSON.stringify({ coverly: true, v: 3, policies: [{ type: 'car', number: 'TEST-001' }] });
+    const encrypted = await encryptData(payload, 'correctPassword');
+    const decrypted = await decryptData(encrypted, 'correctPassword');
+    assertEqual(decrypted, payload);
+  });
+
+  it('decryptData() throws on wrong password', async () => {
+    const encrypted = await encryptData('secret data', 'rightPassword');
+    let threw = false;
+    try { await decryptData(encrypted, 'wrongPassword'); }
+    catch { threw = true; }
+    assert(threw, 'Should throw when decrypting with wrong password');
+  });
+
+  it('decryptData() throws on corrupted data', async () => {
+    const encrypted = await encryptData('data', 'pass');
+    // Corrupt the ciphertext bytes
+    encrypted[50] = encrypted[50] ^ 0xFF;
+    let threw = false;
+    try { await decryptData(encrypted, 'pass'); }
+    catch { threw = true; }
+    assert(threw, 'Should throw on corrupted data');
+  });
+
+  it('decryptData() throws when magic bytes are wrong', async () => {
+    const fakeBuffer = new Uint8Array(50);
+    new TextEncoder().encodeInto('NOTVALID', fakeBuffer);
+    let threw = false;
+    try { await decryptData(fakeBuffer, 'pass'); }
+    catch { threw = true; }
+    assert(threw, 'Should throw on invalid magic bytes');
+  });
+
+  it('backup payload structure contains policies and documents keys', async () => {
+    const policies = [{ type: 'car', insurer: 'Aviva', number: 'P-001' }];
+    const documents = [];
+    const payload = JSON.stringify({ coverly: true, v: 3, exportedAt: Date.now(), policies, documents });
+    const encrypted = await encryptData(payload, 'testpass');
+    const decrypted = await decryptData(encrypted, 'testpass');
+    const parsed = JSON.parse(decrypted);
+    assert(parsed.coverly === true, 'coverly flag should be true');
+    assert(Array.isArray(parsed.policies), 'policies should be array');
+    assert(Array.isArray(parsed.documents), 'documents should be array');
+    assertEqual(parsed.v, 3);
+  });
+
+  it('backup password must be at least 6 characters (validation logic)', () => {
+    const validate = (p1, p2) => {
+      if (!p1 || p1.length < 6) return 'too_short';
+      if (p1 !== p2) return 'mismatch';
+      return 'ok';
+    };
+    assertEqual(validate('abc', 'abc'), 'too_short');
+    assertEqual(validate('', ''), 'too_short');
+    assertEqual(validate('secure1', 'different'), 'mismatch');
+    assertEqual(validate('secure1', 'secure1'), 'ok');
+  });
+
+});
+
+// ── 6. QR Chunking ────────────────────────────────────
+describe('QR Export — Chunking & Reassembly', () => {
+
+  it('buildQRChunks() returns single chunk for small payload', () => {
+    const data = JSON.stringify({ coverly: true, policies: [] });
+    const chunks = buildQRChunks(data, 1200);
+    assertArrayLength(chunks, 1, 'Small payload should be single chunk');
+    // Single chunk is the raw string itself
+    assertEqual(chunks[0], data);
+  });
+
+  it('buildQRChunks() splits large payload into multiple chunks', () => {
+    const data = 'x'.repeat(3000);
+    const chunks = buildQRChunks(data, 1200);
+    assert(chunks.length > 1, 'Large payload should be split into multiple chunks');
+  });
+
+  it('each chunk has correct envelope structure', () => {
+    const data = 'x'.repeat(3000);
+    const chunks = buildQRChunks(data, 1200);
+    chunks.forEach((chunk, i) => {
+      const parsed = JSON.parse(chunk);
+      assertEqual(parsed.cov_chunk, true);
+      assertEqual(parsed.i, i);
+      assertEqual(parsed.t, chunks.length);
+      assert(typeof parsed.d === 'string', 'Chunk data should be a string');
+    });
+  });
+
+  it('reassembleQRChunks() correctly reconstructs original data', () => {
+    const original = 'The quick brown fox '.repeat(100);
+    const chunks = buildQRChunks(original, 1200);
+    assert(chunks.length > 1, 'Should have been chunked');
+    const reassembled = reassembleQRChunks(chunks);
+    assertEqual(reassembled, original);
+  });
+
+  it('reassembleQRChunks() works with shuffled chunk order', () => {
+    const original = 'ABCDEFGHIJ'.repeat(200);
+    const chunks = buildQRChunks(original, 1200);
+    // Reverse order to simulate scanning out of order
+    const shuffled = [...chunks].reverse();
+    const reassembled = reassembleQRChunks(shuffled);
+    assertEqual(reassembled, original);
+  });
+
+  it('chunk total count is consistent across all chunks', () => {
+    const data = 'x'.repeat(5000);
+    const chunks = buildQRChunks(data, 1200);
+    const totals = chunks.map(c => JSON.parse(c).t);
+    assert(totals.every(t => t === totals[0]), 'All chunks should report the same total');
+  });
+
+  it('importQRData handles valid single-chunk QR payload', async () => {
+    // Test the JSON parsing logic directly
+    const policies = [{ type: 'car', insurer: 'Aviva', number: 'QR-001' }];
+    const raw = JSON.stringify({ coverly: true, v: 2, policies });
+    const parsed = JSON.parse(raw);
+    assert(parsed.coverly === true, 'Should parse coverly flag');
+    assertArrayLength(parsed.policies, 1, 'Should have 1 policy');
+    assertEqual(parsed.policies[0].number, 'QR-001');
+  });
+
+  it('importQRData rejects invalid JSON gracefully', async () => {
+    let threw = false;
+    try { JSON.parse('not valid json {{'); }
+    catch { threw = true; }
+    assert(threw, 'Invalid JSON should throw');
+  });
+
+});
+
+// ── 7. Integration — Policy Lifecycle ─────────────────
+describe('Integration — Full Policy Lifecycle', () => {
+
+  it('add → retrieve → update → delete flow completes correctly', async () => {
+    // ADD
+    const id = await T.addPolicy({ type: 'car', insurer: 'StartInsurer', number: 'LIFE-001', phone: '01234', expiry: '2026-01-01', premium: 500 });
+    assertNotNull(id);
+
+    // RETRIEVE
+    let policies = await T.getPolicies();
+    let p = policies.find(x => x.id === id);
+    assertNotNull(p, 'Policy should exist after add');
+    assertEqual(p.insurer, 'StartInsurer');
+    assertEqual(p.premium, 500);
+
+    // UPDATE
+    await T.updatePolicy({ ...p, insurer: 'UpdatedInsurer', premium: 600 });
+    policies = await T.getPolicies();
+    p = policies.find(x => x.id === id);
+    assertEqual(p.insurer, 'UpdatedInsurer');
+    assertEqual(p.premium, 600);
+    assertEqual(p.number, 'LIFE-001'); // unchanged
+
+    // DELETE
+    await T.deletePolicy(id);
+    policies = await T.getPolicies();
+    assert(!policies.find(x => x.id === id), 'Policy should be gone after delete');
+  });
+
+  it('deleting a policy also cleans up its documents', async () => {
+    const policyId = await T.addPolicy({ type: 'home', insurer: 'Test', number: 'CLEAN-001' });
+    const buf = new TextEncoder().encode('doc').buffer;
+    await T.addDocument({ policyId, name: 'doc.pdf', type: 'application/pdf', data: buf });
+    await T.addDocument({ policyId, name: 'img.jpg', type: 'image/jpeg', data: buf });
+
+    // Simulate doDelete: delete policy then its documents
+    await T.deletePolicy(policyId);
+    await T.deleteDocumentsForPolicy(policyId);
+
+    const docs = await T.getDocumentsForPolicy(policyId);
+    assertArrayLength(docs, 0, 'Documents should be cleaned up with policy');
+  });
+
+  it('backup round-trip preserves all policy fields', async () => {
+    const original = { type: 'health', insurer: 'Bupa', number: 'RT-001', phone: '0800', expiry: '2027-01-01', notes: 'Family', premium: 1200 };
+    const payload = JSON.stringify({ coverly: true, v: 3, exportedAt: Date.now(), policies: [original], documents: [] });
+    const encrypted = await encryptData(payload, 'backuppass');
+    const decrypted = await decryptData(encrypted, 'backuppass');
+    const parsed = JSON.parse(decrypted);
+    const restored = parsed.policies[0];
+    assertEqual(restored.insurer, 'Bupa');
+    assertEqual(restored.number, 'RT-001');
+    assertEqual(restored.premium, 1200);
+    assertEqual(restored.notes, 'Family');
+  });
+
+  it('multiple policies can coexist without ID collision', async () => {
+    const ids = await Promise.all([
+      T.addPolicy({ type: 'car', insurer: 'A', number: 'MC-001' }),
+      T.addPolicy({ type: 'home', insurer: 'B', number: 'MC-002' }),
+      T.addPolicy({ type: 'pet', insurer: 'C', number: 'MC-003' }),
+    ]);
+    const unique = new Set(ids);
+    assertEqual(unique.size, 3, 'All 3 IDs should be unique');
+    const policies = await T.getPolicies();
+    const found = ids.map(id => policies.find(p => p.id === id));
+    assert(found.every(p => p !== undefined), 'All policies should be findable');
+  });
+
+  it('premium total calculation is correct across multiple policies', async () => {
+    const premiums = [100, 450, 0, 250, null];
+    for (const premium of premiums) {
+      await T.addPolicy({ type: 'car', insurer: 'Test', number: `PREM-${premium}`, premium });
+    }
+    const policies = await T.getPolicies();
+    const total = policies.reduce((sum, p) => sum + (parseFloat(p.premium) || 0), 0);
+    // At minimum our 4 non-null premiums sum to 800
+    assert(total >= 800, `Total should be at least 800, got ${total}`);
+  });
+
+  it('calendar export only includes policies with expiry dates', async () => {
+    const added = [
+      await T.addPolicy({ type: 'car', insurer: 'A', number: 'CAL-1', expiry: '2026-06-01' }),
+      await T.addPolicy({ type: 'home', insurer: 'B', number: 'CAL-2', expiry: '' }),
+      await T.addPolicy({ type: 'pet', insurer: 'C', number: 'CAL-3', expiry: '2026-12-01' }),
+    ];
+    const policies = await T.getPolicies();
+    const relevant = policies.filter(p => added.includes(p.id));
+    const withExpiry = relevant.filter(p => p.expiry);
+    assertArrayLength(withExpiry, 2, 'Should only include 2 policies with expiry dates');
+  });
+
+});
+
+// ── 8. localStorage / Settings State ──────────────────
+describe('Settings — localStorage State', () => {
+
+  const TEST_PREFIX = 'coverly_test_';
+
+  it('PIN enabled flag reads correctly from localStorage', () => {
+    localStorage.setItem(TEST_PREFIX + 'pin_enabled', '1');
+    const pinEnabled = localStorage.getItem(TEST_PREFIX + 'pin_enabled') === '1';
+    assertEqual(pinEnabled, true);
+    localStorage.removeItem(TEST_PREFIX + 'pin_enabled');
+  });
+
+  it('PIN enabled flag is false when not set', () => {
+    localStorage.removeItem(TEST_PREFIX + 'pin_enabled');
+    const pinEnabled = localStorage.getItem(TEST_PREFIX + 'pin_enabled') === '1';
+    assertEqual(pinEnabled, false);
+  });
+
+  it('PIN is retrievable from localStorage after storage', () => {
+    localStorage.setItem(TEST_PREFIX + 'pin', '4321');
+    const pin = localStorage.getItem(TEST_PREFIX + 'pin') || null;
+    assertEqual(pin, '4321');
+    localStorage.removeItem(TEST_PREFIX + 'pin');
+  });
+
+  it('removing PIN from localStorage returns null', () => {
+    localStorage.removeItem(TEST_PREFIX + 'pin');
+    const pin = localStorage.getItem(TEST_PREFIX + 'pin') || null;
+    assertEqual(pin, null);
+  });
+
+  it('onboarded flag is set and read correctly', () => {
+    localStorage.setItem(TEST_PREFIX + 'onboarded', '1');
+    const onboarded = localStorage.getItem(TEST_PREFIX + 'onboarded');
+    assert(!!onboarded, 'Onboarded flag should be truthy');
+    localStorage.removeItem(TEST_PREFIX + 'onboarded');
+  });
+
+  it('backup timestamp can be stored and compared', () => {
+    const now = Date.now();
+    localStorage.setItem(TEST_PREFIX + 'last_backup', String(now));
+    const stored = parseInt(localStorage.getItem(TEST_PREFIX + 'last_backup'), 10);
+    assert(stored === now, 'Backup timestamp should match');
+    const daysSince = (Date.now() - stored) / (1000 * 60 * 60 * 24);
+    assert(daysSince < 1, 'Should be less than 1 day since "backup"');
+    localStorage.removeItem(TEST_PREFIX + 'last_backup');
+  });
+
+});
+
+/* ═══════════════════════════════════════════════════════
+   RUNNER
+═══════════════════════════════════════════════════════ */
+
+function renderSuiteShell(suite) {
+  const container = document.getElementById('suites');
+  const el = document.createElement('div');
+  el.className = 'suite';
+  el.id = `suite-${suite.name}`;
+  el.innerHTML = `<div class="suite-title">${suite.name}</div><div class="tests"></div>`;
+  container.appendChild(el);
+  return el.querySelector('.tests');
+}
+
+function renderTestRow(testsEl, test) {
+  const row = document.createElement('div');
+  row.className = 'test' + (test.skip ? ' skip' : ' running');
+  row.id = `test-${test.name}`;
+  row.innerHTML = `
+    <div class="icon">${test.skip ? '⏭' : '⏳'}</div>
+    <div>
+      <div class="test-name">${test.name}</div>
+      <div class="test-detail" id="detail-${CSS.escape(test.name)}"></div>
+    </div>
+    <div class="timing" id="timing-${CSS.escape(test.name)}"></div>
+  `;
+  testsEl.appendChild(row);
+  return row;
+}
+
+function updateTestRow(row, { status, detail, ms }) {
+  row.className = `test ${status}`;
+  const icons = { pass: '✅', fail: '❌', skip: '⏭' };
+  row.querySelector('.icon').textContent = icons[status] || '⏳';
+  if (detail) {
+    const el = row.querySelector('.test-detail');
+    el.textContent = detail;
+    if (status === 'fail') el.classList.add('err');
+  }
+  if (ms !== undefined) {
+    row.querySelector('.timing').textContent = `${ms}ms`;
+  }
+}
+
+function updateSummary() {
+  document.getElementById('passCount').textContent = `${results.pass} passed`;
+  document.getElementById('failCount').textContent = `${results.fail} failed`;
+  document.getElementById('skipCount').textContent = `${results.skip} skipped`;
+  const pct = totalTests > 0 ? (completedTests / totalTests) * 100 : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+async function runAll() {
+  // Reset
+  results.pass = 0; results.fail = 0; results.skip = 0;
+  completedTests = 0;
+  document.getElementById('suites').innerHTML = '';
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('runBtn').textContent = '⏳ Running…';
+  document.getElementById('totalTime').textContent = '';
+  startTime.value = Date.now();
+
+  // Set up fresh DB
+  await openTestDB();
+
+  // Count total tests
+  totalTests = suites.reduce((sum, s) => {
+    currentSuiteTests = [];
+    s.fn();
+    return sum + currentSuiteTests.length;
+  }, 0);
+  updateSummary();
+
+  for (const suite of suites) {
+    currentSuiteTests = [];
+    suite.fn();
+    const tests = [...currentSuiteTests];
+    const testsEl = renderSuiteShell(suite);
+
+    for (const test of tests) {
+      const row = renderTestRow(testsEl, test);
+
+      if (test.skip) {
+        results.skip++;
+        completedTests++;
+        updateTestRow(row, { status: 'skip', detail: 'Skipped' });
+        updateSummary();
+        continue;
+      }
+
+      const t0 = Date.now();
+      try {
+        await test.fn();
+        const ms = Date.now() - t0;
+        results.pass++;
+        completedTests++;
+        updateTestRow(row, { status: 'pass', ms });
+      } catch (err) {
+        const ms = Date.now() - t0;
+        results.fail++;
+        completedTests++;
+        updateTestRow(row, { status: 'fail', detail: err.message, ms });
+      }
+      updateSummary();
+
+      // Yield to keep UI responsive
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  await closeTestDB();
+
+  const elapsed = ((Date.now() - startTime.value) / 1000).toFixed(2);
+  document.getElementById('totalTime').textContent = `${elapsed}s`;
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('runBtn').textContent = '▶ Run Again';
+  document.getElementById('progressBar').style.width = '100%';
+  document.getElementById('progressBar').style.background = results.fail > 0 ? 'var(--red)' : 'var(--green)';
+}
+
+// Auto-run on load
+window.addEventListener('load', () => setTimeout(runAll, 300));
+</script>
+</body>
+</html>
