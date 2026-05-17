@@ -1387,7 +1387,7 @@ describe('QR Chunking — Boundary Conditions', () => {
   });
 
   it('reassembly of 2-chunk payload is correct', () => {
-    const original = JSON.stringify({ coverly: true, policies: [{ type: 'car', number: 'TWO-CHUNK', insurer: 'X'.repeat(600) }] });
+    const original = JSON.stringify({ coverly: true, policies: [{ type: 'car', number: 'TWO-CHUNK', insurer: 'X'.repeat(1500) }] });
     const chunks = buildQRChunks(original, 1200);
     assert(chunks.length >= 2, 'Should need at least 2 chunks');
     const result = reassembleQRChunks(chunks);
