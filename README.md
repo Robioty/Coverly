@@ -12,7 +12,9 @@ Store all your policy details locally on your device and access or share them in
 /
 ├── index.html                ← Entire app (single-file PWA)
 ├── manifest.json             ← PWA manifest
-├── sw.js                     ← Service worker (v9)
+├── sw.js                     ← Service worker (v11)
+├── coverly_explainer.html    ← Animated explainer / landing page
+├── coverly_tests.html        ← Browser-based test suite (133 tests)
 ├── icon-192-coverly.png      ← App icon 192×192
 └── icon-512-coverly.png      ← App icon 512×512
 ```
@@ -25,18 +27,22 @@ Store all your policy details locally on your device and access or share them in
 - Card-based policy list with live expiry status badges
 - Per-policy quick actions: Call, SMS, WhatsApp directly from the card
 - Copy policy details to clipboard / native share sheet
+- Pull-to-refresh on the vault list
 - Full edit and delete with confirmation
 
 ### 📋 Rich Policy Fields
 - Type (Car, Health, Home, Life, Travel, Pet, Business, Other)
 - Insurer name, Policy number, Claims phone, Expiry date
 - Emergency contact per policy, Notes field
+- **Annual premium** — optional cost field per policy
 
 ### 📊 Dashboard & Calendar
 - Stats overview: total policies, expired count, renewing soon
+- **Total annual premium spend** stat card (shown when any policies have a premium set)
 - Donut chart showing policy health breakdown
 - Mini monthly calendar with expiry dots and renewal reminder markers
 - Chronological timeline of all expiry and renewal events
+- Improved empty state with actionable prompts when no policies exist or expiry dates are missing
 - Tappable — goes straight to the relevant policy
 
 ### 🚨 Emergency Mode
@@ -66,8 +72,19 @@ Single **Add** nav button opens a sheet with four options:
 - Fields not found labelled `NOT FOUND` in amber
 - Raw extracted text collapsible for debugging
 
+### 📎 Document Attachments
+- Attach photos or PDFs directly to any policy (stored privately on-device via IndexedDB)
+- Supported from Add, Edit, and OCR review screens
+- Up to 20 MB per file
+- Horizontal thumbnail scroll row — tap to view, ✕ to remove
+- Full-screen document viewer: images render inline, PDFs render page-by-page via PDF.js
+- Download button in viewer header
+- Documents included in encrypted `.coverly` backup (serialised as base64)
+- Documents are **not** included in QR export — use encrypted backup for full transfer
+- Deleting a policy also deletes all its attached documents
+
 ### 🔐 Security
-- **PIN lock**: 4-digit keypad with set/confirm/change flow
+- **PIN lock**: 4-digit keypad with set/confirm/change flow; prompts on every page refresh
 - **AES-256-GCM encryption** for backup files (Web Crypto API, 250,000 PBKDF2 iterations)
 - All crypto on-device — password never leaves the device
 
@@ -78,11 +95,19 @@ Single **Add** nav button opens a sheet with four options:
 - Post-download instruction sheet explains not to tap the file directly
 - File Handling API registered in manifest: on supported browsers/Android, tapping a `.coverly` file opens Coverly automatically
 - Backup prompt appears on app open when online + 14+ days since last backup
+- **Document attachments are included in the backup** — large vaults with many attachments will produce larger backup files
+
+### 📅 Calendar Export
+- Export all policy renewal dates as a standard `.ics` file (Settings → Backup & Restore)
+- Imports directly into Google Calendar, Apple Calendar, Outlook, and any iCal-compatible app
+- Generates two events per policy: an expiry event (with a built-in 30-day VALARM alert) and a 30-day renewal reminder event
 
 ### 📲 QR Transfer
-- Export all policies as an encrypted QR code
+- Export all policies as a QR code — large vaults automatically split across multiple QR codes
+- Paginated QR viewer with dot indicators and Prev/Next navigation
+- Receiving device detects chunks, shows scan progress, and reassembles automatically
 - Import on another device by scanning — no internet needed
-- Handles both legacy and v3 QR formats
+- Policy metadata only — document attachments are excluded from QR export
 
 ### 🔍 Find Missing Policies
 - **Email search helper** in Settings: copyable search terms for Gmail, Outlook, Apple Mail
@@ -111,12 +136,42 @@ Single **Add** nav button opens a sheet with four options:
 
 ---
 
+## 🧪 Test Suite
+
+A browser-based test suite is included at `coverly_tests.html` — open it in Chrome to run all tests. No build step or dependencies required.
+
+**133 tests across 15 suites:**
+
+| Suite | Coverage |
+|---|---|
+| Utility Functions | `esc()`, `formatDate()`, `daysUntil()`, `parseDateToISO()`, `getPolicyMeta()` |
+| PIN Lock Logic | Correct/wrong/empty PIN, incomplete entry, inconsistent state, set/confirm flow |
+| Policy CRUD | Add, get, update, delete, field persistence, timestamps, empty vault |
+| Document Attachments | Add, retrieve, delete, cascade delete, data integrity across policies |
+| Backup Encryption | Magic bytes, random output, round-trip, wrong password, corrupted data |
+| QR Chunking | Single/multi chunk, envelope structure, reassembly, out-of-order chunks |
+| Integration | Full lifecycle, doc cleanup on delete, backup round-trip, ID uniqueness |
+| localStorage State | PIN flags, onboarding flag, backup timestamp |
+| expiryBadge() | Expired/amber/blue/green boundaries, exact day counts |
+| buildTimelineEvents() | Sorting, urgent vs expiry, renew reminders, multi-policy ordering |
+| parseDateToISO() extended | Dot/slash separators, 2-digit years, single-digit days, invalid strings |
+| base64 Serialisation | Text/binary round-trip, empty buffer, policyId remapping, orphan skipping |
+| QR Boundary Conditions | Exact MAX size, one-byte-over, empty chunk prevention, contiguous indices |
+| Policy Validation | Empty/null/whitespace number, ISO expiry format, negative/null premium |
+| buildEmergencyMsg() | Header, type, number, maps link, location name, URL-encodability |
+
+Tests use an isolated `coverlyTestDB` and never touch real user data.
+
+---
+
 ## 🗺️ Deployment
 
 ### GitHub Pages
 1. Push all files to repo root
 2. Settings → Pages → `main` branch → `/` (root)
-3. Visit `https://yourusername.github.io/coverly`
+3. Visit `https://yourusername.github.io/Coverly`
+
+The explainer page is available at `https://yourusername.github.io/Coverly/coverly_explainer.html`.
 
 ### Play Store (TWA)
 Use [PWABuilder](https://www.pwabuilder.com/) to wrap into an Android APK.
@@ -127,7 +182,7 @@ Use [PWABuilder](https://www.pwabuilder.com/) to wrap into an Android APK.
 
 | Feature | Technology |
 |---|---|
-| Data storage | IndexedDB |
+| Data storage | IndexedDB (v3 schema) |
 | Offline | Service Worker + Cache API |
 | QR codes | qrcode.js + jsQR |
 | OCR | Tesseract.js v5 |
@@ -136,6 +191,7 @@ Use [PWABuilder](https://www.pwabuilder.com/) to wrap into an Android APK.
 | Location | Geolocation API + OpenStreetMap Nominatim |
 | Notifications | Web Notifications API (on-device) |
 | Share | Web Share API + SMS/WhatsApp URIs |
+| Calendar export | iCalendar (.ics) — generated client-side |
 
 ---
 
@@ -144,15 +200,14 @@ Use [PWABuilder](https://www.pwabuilder.com/) to wrap into an Android APK.
 - Notifications require the app to be opened to fire (no background push without a server)
 - `.coverly` file association requires PWA to be installed; browser-only users should restore from within the app
 - OCR accuracy varies with image quality — digital PDFs are always more reliable
-- QR export has a payload limit; very large vaults with long notes may need to reduce data
+- QR export excludes document attachments — use encrypted backup for full vault transfer
+- Backups containing many document attachments may be large; store accordingly
 
 ---
 
 ## 🔮 Roadmap
 
 - 🔐 Biometric unlock (WebAuthn)
-- 📎 Document photo attachment per policy
-- 📅 Calendar export (.ics) for renewal dates
 - 🌐 Multi-language support
 - 🎨 Light mode
 - 📲 Play Store / App Store (TWA / Capacitor)
