@@ -864,7 +864,7 @@ let locationName = null;
 let activeTab = 'home';
 let appPin = localStorage.getItem('coverly_pin') || null;
 let pinEnabled = localStorage.getItem('coverly_pin_enabled') === '1';
-let isUnlocked = !pinEnabled; // resets to false on every page load when PIN is enabled
+let isUnlocked = !pinEnabled;
 let scanAnimId = null;
 let pendingOCRData = null;
 let editingPolicyId = null;
@@ -1003,6 +1003,7 @@ function getLocation() {
 }
 
 function renderIfHome() {
+  if (!isUnlocked) return; // never overwrite the PIN screen
   if (activeTab === 'home') renderHome();
   else if (activeTab === 'dashboard') renderDashboard();
 }
@@ -3067,7 +3068,7 @@ function updatePinDots() {
 function checkPin() {
   if (pinMode === 'unlock') {
     if (!appPin) {
-      // Inconsistent state — PIN enabled flag set but no PIN stored, clear and let through
+      // Inconsistent state — clear and let through
       pinEnabled = false;
       isUnlocked = true;
       localStorage.removeItem('coverly_pin_enabled');
